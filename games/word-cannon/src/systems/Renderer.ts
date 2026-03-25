@@ -700,8 +700,8 @@ export class Renderer {
       y += 8;
     }
 
-    // Revive button
-    if (canRevive) {
+    // Revive button (hidden during Basic Launch — no ads)
+    if (false && canRevive) {
       const bw = 260, bh = 40;
       c.fillStyle = C.COLOR_ENEMY_POWERUP; c.shadowColor = C.COLOR_ENEMY_POWERUP; c.shadowBlur = 20;
       c.beginPath(); c.roundRect(cx - bw / 2, y, bw, bh, 8); c.fill(); c.shadowBlur = 0;
@@ -756,8 +756,8 @@ export class Renderer {
     c.fillText(`Next: ${nextLevel.minWordLen}-${nextLevel.maxWordLen} letter words \u00B7 ${nextLevel.wordsToKill} targets`, cx, y + 4);
     y += 28;
 
-    // Rewarded ad button — full heal + 2 shields
-    if (!rewardClaimed) {
+    // Rewarded ad button — full heal + 2 shields (hidden during Basic Launch — no ads)
+    if (false && !rewardClaimed) {
       const bw = 300, bh = 42;
       const btnY = y + 6;
       // Pulsing glow

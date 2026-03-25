@@ -3,3 +3,4 @@ dist/
 .context/
 .vite/
 *.log
+.DS_Store
