@@ -1,4 +1,4 @@
-export type EnemyType = 'normal' | 'debuff' | 'powerup';
+export type EnemyType = 'normal' | 'debuff' | 'powerup' | 'tank' | 'boss' | 'splitter';
 
 export type DebuffKind = 'rush';
 export type PowerupKind = 'freeze' | 'shield' | 'heal';
@@ -20,6 +20,16 @@ export interface Enemy {
   width: number;
   height: number;
   spawnTime: number;
+  // HP / segment system
+  wordSegments: string[];
+  currentSegment: number;
+  maxSegments: number;
+  sizeScale: number;
+  splitOnDeath: boolean;
+  splitWordLen: number;
+  bottomPauseUntil?: number;
+  savedSpeed?: number;
+  autoTyped: number; // letters removed by missiles (faded out, not targetable)
 }
 
 export interface Particle {
@@ -31,6 +41,14 @@ export interface Particle {
   maxLife: number;
   color: string;
   size: number;
+}
+
+export interface CritSlash {
+  x: number;
+  y: number;
+  spawnTime: number;
+  duration: number;
+  angle: number;
 }
 
 export interface ActiveDebuff {
@@ -51,6 +69,66 @@ export interface Bullet {
   speed: number;
   progress: number;
   color: string;
+}
+
+// ── Visual Effects ──
+
+export interface Explosion {
+  x: number;
+  y: number;
+  radius: number;
+  maxRadius: number;
+  life: number;
+  maxLife: number;
+  color: string;
+}
+
+export interface LightningArc {
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  life: number;
+  maxLife: number;
+  segments: { x: number; y: number }[];
+}
+
+export interface Missile {
+  x: number;
+  y: number;
+  targetId: number;
+  speed: number;
+  trail: { x: number; y: number }[];
+  life: number;
+  orbitAngle: number;
+  orbitCenterX: number;
+  orbitCenterY: number;
+  lastHitId?: number;
+}
+
+export interface DamageNumber {
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+  vy: number;
+  life: number;
+  maxLife: number;
+}
+
+// ── Upgrades ──
+
+export type UpgradeCategory = 'weapon' | 'defense' | 'risk' | 'typing';
+
+export interface UpgradeDef {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: UpgradeCategory;
+  maxStacks: number;
+  color: string;
+  levelDescriptions: string[];
 }
 
 // ── Persistence ──
