@@ -1,7 +1,7 @@
 export type EnemyType = 'normal' | 'debuff' | 'powerup';
 
-export type DebuffKind = 'blur' | 'scramble' | 'rush';
-export type PowerupKind = 'chain' | 'freeze' | 'shield';
+export type DebuffKind = 'rush';
+export type PowerupKind = 'freeze' | 'shield' | 'heal';
 
 export interface Enemy {
   id: number;
@@ -19,6 +19,7 @@ export interface Enemy {
   targeted: boolean;
   width: number;
   height: number;
+  spawnTime: number;
 }
 
 export interface Particle {

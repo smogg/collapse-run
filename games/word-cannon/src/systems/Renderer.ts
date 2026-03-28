@@ -348,7 +348,7 @@ export class Renderer {
     c.fillRect(0, y, this._w, this._h - y);
   }
 
-  drawEnemy(enemy: Enemy, now: number, scramble = false): void {
+  drawEnemy(enemy: Enemy, now: number): void {
     const c = this.ctx;
     const { x, y, word, typed, type, alpha, scale: s, targeted } = enemy;
     c.save();
@@ -364,11 +364,25 @@ export class Renderer {
     const r = 10;
     enemy.width = boxW;
     enemy.height = boxH;
+
+    // Special enemies get a pulsing outer glow ring
+    if (type === 'debuff' || type === 'powerup') {
+      const glowPulse = 0.4 + 0.6 * Math.sin(now / 200);
+      c.shadowColor = color;
+      c.shadowBlur = 30 * glowPulse;
+      c.strokeStyle = color;
+      c.lineWidth = 2;
+      c.globalAlpha = alpha * glowPulse * 0.5;
+      c.beginPath(); c.roundRect(-boxW / 2 - 6, -boxH / 2 - 6, boxW + 12, boxH + 12, r + 4); c.stroke();
+      c.globalAlpha = alpha;
+      c.shadowBlur = 0;
+    }
+
     c.shadowColor = color;
-    c.shadowBlur = targeted ? 25 : (type === 'powerup' ? 18 : type === 'debuff' ? 15 : 8);
-    c.fillStyle = 'rgba(8, 8, 20, 0.85)';
+    c.shadowBlur = targeted ? 25 : (type === 'powerup' ? 22 : type === 'debuff' ? 20 : 8);
+    c.fillStyle = type === 'debuff' ? 'rgba(40, 4, 8, 0.9)' : type === 'powerup' ? 'rgba(30, 25, 4, 0.9)' : 'rgba(8, 8, 20, 0.85)';
     c.strokeStyle = color;
-    c.lineWidth = targeted ? 2.5 : 1.5;
+    c.lineWidth = type === 'normal' ? (targeted ? 2.5 : 1.5) : (targeted ? 3 : 2.5);
     c.beginPath(); c.roundRect(-boxW / 2, -boxH / 2, boxW, boxH, r); c.fill(); c.stroke();
     c.shadowBlur = 0;
 
@@ -388,15 +402,19 @@ export class Renderer {
       const isTyped = i < typed;
       if (isTyped) { c.fillStyle = '#ffffff'; c.shadowColor = '#ffffff'; c.shadowBlur = 6; }
       else { c.fillStyle = type === 'debuff' ? 'rgba(255,130,140,0.9)' : type === 'powerup' ? 'rgba(255,230,140,0.9)' : 'rgba(160,180,220,0.8)'; c.shadowBlur = 0; }
-      const jx = scramble && !isTyped ? Math.sin(now / 50 + i * 7) * 3 : 0;
-      const jy = scramble && !isTyped ? Math.cos(now / 60 + i * 11) * 3 : 0;
-      c.fillText(word[i], cursorX + jx, -1 + jy);
+      c.fillText(word[i], cursorX, -1);
       c.shadowBlur = 0;
       cursorX += c.measureText(word[i]).width;
     }
 
-    if (type === 'debuff') this.drawBadge(c, 0, -boxH / 2 - 10, 'TRAP', '#ff3344', '#ff3344');
-    else if (type === 'powerup') this.drawBadge(c, 0, -boxH / 2 - 10, 'POWER', '#ffcc00', '#ffcc00');
+    // Badges — bigger and bolder for special enemies
+    if (type === 'debuff') this.drawBadge(c, 0, -boxH / 2 - 12, '\u26A0 RUSH', '#ff3344', '#ff3344', now);
+    else if (type === 'powerup') {
+      const label = enemy.powerupKind === 'shield' ? '\u2666 SHIELD'
+        : enemy.powerupKind === 'heal' ? '\u2764 HEAL'
+        : '\u2744 FREEZE';
+      this.drawBadge(c, 0, -boxH / 2 - 12, label, '#ffcc00', '#ffcc00', now);
+    }
 
     if (targeted) {
       const pulse = 0.5 + 0.5 * Math.sin(now / 100);
@@ -407,11 +425,12 @@ export class Renderer {
     c.restore();
   }
 
-  private drawBadge(c: CanvasRenderingContext2D, x: number, y: number, text: string, bg: string, glow: string): void {
-    c.font = 'bold 10px "Courier New", monospace';
-    const bw = c.measureText(text).width + 10, bh = 14;
-    c.fillStyle = bg; c.shadowColor = glow; c.shadowBlur = 8;
-    c.beginPath(); c.roundRect(x - bw / 2, y - bh / 2, bw, bh, 4); c.fill();
+  private drawBadge(c: CanvasRenderingContext2D, x: number, y: number, text: string, bg: string, glow: string, now: number): void {
+    const pulse = 0.8 + 0.2 * Math.sin(now / 150);
+    c.font = 'bold 11px "Courier New", monospace';
+    const bw = c.measureText(text).width + 14, bh = 18;
+    c.fillStyle = bg; c.shadowColor = glow; c.shadowBlur = 14 * pulse;
+    c.beginPath(); c.roundRect(x - bw / 2, y - bh / 2, bw, bh, 5); c.fill();
     c.shadowBlur = 0;
     c.fillStyle = '#000'; c.textAlign = 'center'; c.textBaseline = 'middle';
     c.fillText(text, x, y);
@@ -452,18 +471,20 @@ export class Renderer {
 
   drawRushOverlay(now: number): void {
     const c = this.ctx;
-    const pulse = 0.08 + 0.04 * Math.sin(now / 150);
-    c.strokeStyle = `rgba(255, 50, 50, ${pulse * 3})`; c.lineWidth = 6;
-    c.beginPath(); c.roundRect(3, 3, this._w - 6, this._h - 6, 4); c.stroke();
-  }
-
-  drawBlurOverlay(intensity: number): void {
-    const c = this.ctx;
-    const grad = c.createRadialGradient(this._w / 2, this._h / 2, this._w * 0.1, this._w / 2, this._h / 2, this._w * 0.7);
-    grad.addColorStop(0, 'rgba(80, 0, 120, 0)');
-    grad.addColorStop(1, `rgba(80, 0, 120, ${intensity * 0.25})`);
+    const pulse = 0.08 + 0.06 * Math.sin(now / 120);
+    // Thick pulsing red border
+    c.strokeStyle = `rgba(255, 40, 40, ${pulse * 4})`; c.lineWidth = 8;
+    c.beginPath(); c.roundRect(2, 2, this._w - 4, this._h - 4, 6); c.stroke();
+    // Inner softer glow
+    c.strokeStyle = `rgba(255, 80, 60, ${pulse * 2})`; c.lineWidth = 3;
+    c.beginPath(); c.roundRect(8, 8, this._w - 16, this._h - 16, 4); c.stroke();
+    // Corner vignette
+    const grad = c.createRadialGradient(this._w / 2, this._h / 2, this._w * 0.3, this._w / 2, this._h / 2, this._w * 0.7);
+    grad.addColorStop(0, 'rgba(255, 0, 0, 0)');
+    grad.addColorStop(1, `rgba(255, 0, 0, ${pulse * 0.5})`);
     c.fillStyle = grad; c.fillRect(0, 0, this._w, this._h);
   }
+
 
   // ── HUD ──
 
@@ -556,28 +577,60 @@ export class Renderer {
       c.shadowBlur = 0;
     }
 
-    // Active effects — tiny icons along bottom-left
+    // Active effects — prominent banners with timer bars
+    const effectY = this._h - 70;
     let ex = 16;
-    const ey = this._h - 48;
-    c.font = 'bold 10px "Courier New", monospace';
+    const effectH = 28, effectR = 6;
     c.textBaseline = 'middle';
+
     for (const d of debuffs) {
-      if (d.endsAt > now) {
-        c.fillStyle = C.COLOR_ENEMY_DEBUFF;
-        c.globalAlpha = 0.5 + 0.3 * Math.sin(now / 150);
-        c.fillText(d.kind.toUpperCase(), ex, ey);
-        c.globalAlpha = 1;
-        ex += c.measureText(d.kind.toUpperCase()).width + 10;
-      }
+      if (d.endsAt <= now) continue;
+      const remaining = (d.endsAt - now) / C.DEBUFF_RUSH_DURATION;
+      const pulse = 0.7 + 0.3 * Math.sin(now / 100);
+      const label = '\u26A0 RUSH';
+      c.font = 'bold 13px "Courier New", monospace';
+      const tw = c.measureText(label).width + 20;
+      // Background
+      c.fillStyle = `rgba(255, 30, 50, ${0.25 * pulse})`;
+      c.shadowColor = C.COLOR_ENEMY_DEBUFF; c.shadowBlur = 12 * pulse;
+      c.beginPath(); c.roundRect(ex, effectY, tw, effectH, effectR); c.fill();
+      c.shadowBlur = 0;
+      // Timer bar
+      c.fillStyle = `rgba(255, 50, 70, ${0.7 * pulse})`;
+      c.beginPath(); c.roundRect(ex, effectY, tw * remaining, effectH, effectR); c.fill();
+      // Border
+      c.strokeStyle = `rgba(255, 80, 100, ${pulse})`;
+      c.lineWidth = 1.5;
+      c.beginPath(); c.roundRect(ex, effectY, tw, effectH, effectR); c.stroke();
+      // Text
+      c.fillStyle = '#ffffff'; c.textAlign = 'center';
+      c.fillText(label, ex + tw / 2, effectY + effectH / 2);
+      ex += tw + 8;
     }
+
     for (const p of powerups) {
-      if (p.endsAt > now) {
-        c.fillStyle = C.COLOR_ENEMY_POWERUP;
-        c.globalAlpha = 0.6;
-        c.fillText(p.kind.toUpperCase(), ex, ey);
-        c.globalAlpha = 1;
-        ex += c.measureText(p.kind.toUpperCase()).width + 10;
-      }
+      if (p.endsAt <= now) continue;
+      const remaining = (p.endsAt - now) / C.POWERUP_FREEZE_DURATION;
+      const pulse = 0.8 + 0.2 * Math.sin(now / 200);
+      const label = p.kind === 'freeze' ? '\u2744 FREEZE' : p.kind.toUpperCase();
+      c.font = 'bold 13px "Courier New", monospace';
+      const tw = c.measureText(label).width + 20;
+      // Background
+      c.fillStyle = `rgba(255, 200, 0, ${0.2 * pulse})`;
+      c.shadowColor = C.COLOR_ENEMY_POWERUP; c.shadowBlur = 10 * pulse;
+      c.beginPath(); c.roundRect(ex, effectY, tw, effectH, effectR); c.fill();
+      c.shadowBlur = 0;
+      // Timer bar
+      c.fillStyle = `rgba(255, 210, 50, ${0.5 * pulse})`;
+      c.beginPath(); c.roundRect(ex, effectY, tw * remaining, effectH, effectR); c.fill();
+      // Border
+      c.strokeStyle = `rgba(255, 220, 80, ${pulse})`;
+      c.lineWidth = 1.5;
+      c.beginPath(); c.roundRect(ex, effectY, tw, effectH, effectR); c.stroke();
+      // Text
+      c.fillStyle = '#ffffff'; c.textAlign = 'center';
+      c.fillText(label, ex + tw / 2, effectY + effectH / 2);
+      ex += tw + 8;
     }
   }
 

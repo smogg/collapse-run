@@ -55,12 +55,12 @@ export function getLevelDef(level: number): LevelDef {
   const l = level - 1;
   return {
     level,
-    wordsToKill: 8 + l * 4,
-    minWordLen: Math.min(1 + Math.floor(l / 2), 5),
-    maxWordLen: Math.min(3 + l, 9),
-    baseSpeed: 35 + l * 5,
-    maxSpeed: 80 + l * 10,
-    spawnInterval: Math.max(600, 2000 - l * 150),
+    wordsToKill: 8 + l * 3,
+    minWordLen: Math.min(1 + Math.floor(l / 3), 5),
+    maxWordLen: Math.min(3 + Math.floor(l * 0.7), 9),
+    baseSpeed: 35 + l * 1,
+    maxSpeed: 80 + l * 2,
+    spawnInterval: Math.max(1200, 2000 - l * 20),
     debuffsEnabled: level >= 4,
     powerupsEnabled: level >= 3,
   };
@@ -103,6 +103,7 @@ export class Game {
   private level = 1;
   private levelDef: LevelDef = getLevelDef(1);
   private levelWordsKilled = 0;
+  private levelEnemiesSpawned = 0;
 
   // Targeting
   private targetEnemy: Enemy | null = null;
@@ -429,8 +430,10 @@ export class Game {
     if (enemy.type === 'debuff') {
       this.applyDebuff(enemy.debuffKind!);
       this.audio.playDebuff();
-      this.spawnParticles(enemy.x, enemy.y, C.COLOR_ENEMY_DEBUFF, C.PARTICLE_COUNT_KILL);
-      this.flashScreen(C.COLOR_ENEMY_DEBUFF, 0.3);
+      this.spawnParticles(enemy.x, enemy.y, C.COLOR_ENEMY_DEBUFF, 30);
+      this.spawnParticles(enemy.x, enemy.y, '#ff8800', 10);
+      this.flashScreen(C.COLOR_ENEMY_DEBUFF, 0.45);
+      this.triggerShake(12, 500);
       this.combo = 0;
       return;
     }
@@ -438,8 +441,10 @@ export class Game {
     if (enemy.type === 'powerup') {
       this.applyPowerup(enemy.powerupKind!);
       this.audio.playPowerup();
-      this.spawnParticles(enemy.x, enemy.y, C.COLOR_ENEMY_POWERUP, C.PARTICLE_COUNT_KILL);
-      this.flashScreen(C.COLOR_ENEMY_POWERUP, 0.15);
+      this.spawnParticles(enemy.x, enemy.y, C.COLOR_ENEMY_POWERUP, 28);
+      this.spawnParticles(enemy.x, enemy.y, '#ffffff', 12);
+      this.flashScreen(C.COLOR_ENEMY_POWERUP, 0.3);
+      this.triggerShake(5, 200);
     } else {
       this.audio.playKill();
       this.spawnParticles(enemy.x, enemy.y, C.COLOR_ENEMY_NORMAL, C.PARTICLE_COUNT_KILL);
@@ -461,23 +466,6 @@ export class Game {
     }
     this.lastKillTime = now;
     if (this.combo > this.longestCombo) this.longestCombo = this.combo;
-
-    if (this.hasPowerup('chain')) {
-      const nearby = this.enemies.filter(e =>
-        e.active && e !== enemy &&
-        Math.abs(e.x - enemy.x) < 120 && Math.abs(e.y - enemy.y) < 80
-      );
-      if (nearby.length > 0) {
-        const ct = nearby[0];
-        ct.active = false;
-        if (ct === this.targetEnemy) this.targetEnemy = null;
-        this.score += ct.word.length * C.SCORE_PER_LETTER;
-        this.wordsKilled++;
-        this.levelWordsKilled++;
-        this.spawnParticles(ct.x, ct.y, '#88ffff', C.PARTICLE_COUNT_KILL);
-        this.audio.playKill();
-      }
-    }
 
     if (this.levelWordsKilled >= this.levelDef.wordsToKill) {
       this.completeLevel();
@@ -517,6 +505,7 @@ export class Game {
     this.level++;
     this.levelDef = getLevelDef(this.level);
     this.levelWordsKilled = 0;
+    this.levelEnemiesSpawned = 0;
     this.health = C.HEALTH_MAX;
     this.state = 'playing';
     this.enemies = [];
@@ -553,13 +542,8 @@ export class Game {
 
   private applyDebuff(kind: DebuffKind): void {
     const now = performance.now();
-    const durations: Record<DebuffKind, number> = {
-      blur: C.DEBUFF_BLUR_DURATION,
-      scramble: C.DEBUFF_SCRAMBLE_DURATION,
-      rush: C.DEBUFF_RUSH_DURATION,
-    };
-    this.debuffs.push({ kind, endsAt: now + durations[kind] });
-    this.triggerShake(6, 300);
+    this.debuffs.push({ kind, endsAt: now + C.DEBUFF_RUSH_DURATION });
+    this.triggerShake(10, 400);
   }
 
   private applyPowerup(kind: PowerupKind): void {
@@ -567,12 +551,12 @@ export class Game {
       this.shields++;
       return;
     }
+    if (kind === 'heal') {
+      this.health = Math.min(this.health + 1, C.HEALTH_MAX);
+      return;
+    }
     const now = performance.now();
-    const durations: Record<'chain' | 'freeze', number> = {
-      chain: C.POWERUP_CHAIN_DURATION,
-      freeze: C.POWERUP_FREEZE_DURATION,
-    };
-    this.powerups.push({ kind, endsAt: now + durations[kind] });
+    this.powerups.push({ kind, endsAt: now + C.POWERUP_FREEZE_DURATION });
   }
 
   private hasDebuff(kind: DebuffKind): boolean {
@@ -624,30 +608,38 @@ export class Game {
     if (roll < C.DEBUFF_CHANCE && ld.debuffsEnabled && enoughEnemies) {
       type = 'debuff';
       word = getDebuffWord();
-      const debuffs: DebuffKind[] = ['blur', 'scramble', 'rush'];
-      debuffKind = debuffs[Math.floor(Math.random() * debuffs.length)];
+      debuffKind = 'rush';
     } else if (roll < C.DEBUFF_CHANCE + C.POWERUP_CHANCE && ld.powerupsEnabled && enoughEnemies) {
       type = 'powerup';
       word = getPowerupWord();
-      const pups: PowerupKind[] = ['chain', 'freeze', 'shield'];
+      const pups: PowerupKind[] = ['freeze', 'shield'];
+      if (this.level >= 5) pups.push('heal');
       powerupKind = pups[Math.floor(Math.random() * pups.length)];
     } else {
       word = getRandomWord(ld.minWordLen, ld.maxWordLen);
     }
 
+    // For levels 1-10, strictly prevent duplicate first letters on screen
+    const strictNoDupLetters = this.level <= 10;
     const activeFirstLetters = new Set(
-      this.enemies.filter(e => e.active && e.targeted).map(e => e.word[0])
+      this.enemies.filter(e => e.active).map(e => e.word[0])
     );
-    if (activeFirstLetters.has(word[0]) && type === 'normal') {
-      for (let attempt = 0; attempt < 5; attempt++) {
-        const alt = getRandomWord(ld.minWordLen, ld.maxWordLen);
-        if (!activeFirstLetters.has(alt[0])) { word = alt; break; }
+    if (activeFirstLetters.has(word[0])) {
+      if (type === 'normal') {
+        for (let attempt = 0; attempt < 10; attempt++) {
+          const alt = getRandomWord(ld.minWordLen, ld.maxWordLen);
+          if (!activeFirstLetters.has(alt[0])) { word = alt; break; }
+        }
       }
+      // If still a duplicate and strict mode, skip this spawn entirely
+      if (strictNoDupLetters && activeFirstLetters.has(word[0])) return;
     }
 
     const elapsed = (now - this.runStartTime) / 1000;
     const baseSpeed = ld.baseSpeed + elapsed * C.ENEMY_SPEED_RAMP;
-    const speed = Math.min(baseSpeed, ld.maxSpeed);
+    let speed = Math.min(baseSpeed, ld.maxSpeed);
+    if (this.levelEnemiesSpawned < C.WARMUP_ENEMY_COUNT) speed *= C.WARMUP_SPEED_MULT;
+    this.levelEnemiesSpawned++;
     const actualSpeed = this.hasPowerup('freeze') ? speed * 0.3 : speed;
 
     const estWidth = word.length * 20 + 36;
@@ -667,9 +659,9 @@ export class Game {
 
     this.enemies.push({
       id: this.nextEnemyId++,
-      word, typed: 0, x, y: -30,
+      word, typed: 0, x, y: 10,
       speed: actualSpeed, type, debuffKind, powerupKind,
-      alpha: 1, scale: 1, active: true, targeted: false,
+      alpha: 0, scale: 0.5, active: true, targeted: false, spawnTime: now,
       width: 0, height: 0,
     });
   }
@@ -679,6 +671,7 @@ export class Game {
     this.level = 1;
     this.levelDef = getLevelDef(1);
     this.levelWordsKilled = 0;
+    this.levelEnemiesSpawned = 0;
     this.enemies = [];
     this.particles = [];
     this.bullets = [];
@@ -823,9 +816,9 @@ export class Game {
 
     // Spawn
     const ld = this.levelDef;
-    const spawnInterval = Math.max(ld.spawnInterval * 0.5, ld.spawnInterval - this.runElapsed * 10);
+    const spawnInterval = Math.max(ld.spawnInterval * 0.5, ld.spawnInterval - this.runElapsed * C.ENEMY_SPAWN_RAMP);
     const activeCount = this.enemies.filter(e => e.active).length;
-    const minEnemies = Math.min(2 + Math.floor(this.level / 2), 5);
+    const minEnemies = Math.min(1 + Math.floor(this.level / 4), 3);
     if (now - this.lastSpawnTime > spawnInterval || activeCount < minEnemies) {
       this.spawnEnemy();
       this.lastSpawnTime = now;
@@ -839,6 +832,13 @@ export class Game {
       let spd = freezeActive ? e.speed * 0.3 : e.speed;
       if (rushActive) spd *= 1.8;
       e.y += spd * dt;
+
+      // Fade/scale in over 200ms
+      if (e.alpha < 1) {
+        const t = Math.min((now - e.spawnTime) / 200, 1);
+        e.alpha = t;
+        e.scale = 0.5 + t * 0.5;
+      }
 
       if (e.y > this.renderer.h - C.CANNON_Y_OFFSET + 10) {
         e.active = false;
@@ -922,9 +922,8 @@ export class Game {
 
     for (const b of this.bullets) this.renderer.drawBullet(b);
 
-    const scrambleActive = this.hasDebuff('scramble');
     for (const e of this.enemies) {
-      if (e.active) this.renderer.drawEnemy(e, now, scrambleActive);
+      if (e.active) this.renderer.drawEnemy(e, now);
     }
 
     for (const p of this.particles) this.renderer.drawParticle(p);
@@ -933,7 +932,6 @@ export class Game {
     this.renderer.drawDangerZone(this.renderer.h - C.CANNON_Y_OFFSET + 10, now);
 
     if (this.flashAlpha > 0) this.renderer.drawFlash(this.flashColor, this.flashAlpha);
-    if (this.hasDebuff('blur')) this.renderer.drawBlurOverlay(0.7);
     if (this.hasDebuff('rush')) this.renderer.drawRushOverlay(now);
 
     const accuracy = this.totalKeys > 0 ? Math.round((this.correctKeys / this.totalKeys) * 100) : 100;

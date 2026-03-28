@@ -71,37 +71,62 @@ export class AudioManager {
     noise.start();
   }
 
-  /** Debuff triggered — nasty buzz */
+  /** Debuff triggered — alarming siren */
   playDebuff(): void {
     const ctx = this.getCtx();
+    // Main siren sweep
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
     osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(150, ctx.currentTime);
-    osc.frequency.linearRampToValueAtTime(80, ctx.currentTime + 0.3);
-    g.gain.setValueAtTime(0.12, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.frequency.setValueAtTime(300, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(100, ctx.currentTime + 0.15);
+    osc.frequency.linearRampToValueAtTime(250, ctx.currentTime + 0.3);
+    osc.frequency.linearRampToValueAtTime(60, ctx.currentTime + 0.5);
+    g.gain.setValueAtTime(0.18, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
     osc.connect(g).connect(this.gain());
     osc.start();
-    osc.stop(ctx.currentTime + 0.3);
+    osc.stop(ctx.currentTime + 0.5);
+    // Impact thud
+    const osc2 = ctx.createOscillator();
+    const g2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(80, ctx.currentTime);
+    osc2.frequency.exponentialRampToValueAtTime(20, ctx.currentTime + 0.3);
+    g2.gain.setValueAtTime(0.25, ctx.currentTime);
+    g2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc2.connect(g2).connect(this.gain());
+    osc2.start();
+    osc2.stop(ctx.currentTime + 0.3);
   }
 
-  /** Powerup collected — ascending arpeggio */
+  /** Powerup collected — triumphant ascending arpeggio */
   playPowerup(): void {
     const ctx = this.getCtx();
-    const freqs = [523, 659, 784, 1047];
+    const freqs = [523, 659, 784, 1047, 1319];
     freqs.forEach((f, i) => {
       const osc = ctx.createOscillator();
       const g = ctx.createGain();
       osc.type = 'sine';
       osc.frequency.value = f;
-      const t = ctx.currentTime + i * 0.06;
-      g.gain.setValueAtTime(0.1, t);
-      g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+      const t = ctx.currentTime + i * 0.07;
+      g.gain.setValueAtTime(0.14, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
       osc.connect(g).connect(this.gain());
       osc.start(t);
-      osc.stop(t + 0.15);
+      osc.stop(t + 0.2);
     });
+    // Shimmer layer
+    const osc2 = ctx.createOscillator();
+    const g2 = ctx.createGain();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(1500, ctx.currentTime);
+    osc2.frequency.exponentialRampToValueAtTime(2500, ctx.currentTime + 0.4);
+    g2.gain.setValueAtTime(0.05, ctx.currentTime);
+    g2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    osc2.connect(g2).connect(this.gain());
+    osc2.start();
+    osc2.stop(ctx.currentTime + 0.4);
   }
 
   /** Player hit — thud */
