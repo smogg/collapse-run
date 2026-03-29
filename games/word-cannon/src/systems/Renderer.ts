@@ -1356,7 +1356,13 @@ export class Renderer {
     c.fillRect(0, 0, this._w, this._h);
 
     const cx = this._w / 2;
-    let y = this._h * 0.04;
+
+    // Calculate total content height to center vertically
+    // Header (DESTROYED + level): ~70, Score block: ~50, Stat card: 140+12, Retry: ~20, gaps: ~30
+    let contentH = 70 + 50 + 152 + 20 + 30;
+    if (newTitle) contentH += 20;
+    if (nemesisLetter) contentH += 16;
+    let y = Math.max(40, (this._h - contentH) / 2);
 
     c.fillStyle = C.COLOR_ENEMY_DEBUFF;
     c.shadowColor = C.COLOR_ENEMY_DEBUFF; c.shadowBlur = 25;
@@ -1364,17 +1370,12 @@ export class Renderer {
     c.textAlign = 'center'; c.textBaseline = 'middle';
     c.fillText('DESTROYED', cx, y);
     c.shadowBlur = 0;
-
-    const titleLabel = TITLES_MAP[profile.currentTitle] || 'RECRUIT';
-    c.fillStyle = 'rgba(255,200,0,0.5)';
-    c.font = '11px "Courier New", monospace';
-    c.fillText(`[ ${titleLabel} ]`, cx, y + 22);
-    y += 44;
+    y += 36;
 
     c.fillStyle = 'rgba(160,180,220,0.5)';
     c.font = '13px "Courier New", monospace';
     c.fillText(`Level ${stats.level}  \u00B7  Best: Level ${profile.highLevel}`, cx, y);
-    y += 32;
+    y += 34;
 
     c.fillStyle = '#ffffff';
     c.shadowColor = 'rgba(100,180,255,0.4)'; c.shadowBlur = 15;
@@ -1413,23 +1414,6 @@ export class Renderer {
     y += 6;
 
     y = this.drawStatCard(stats, y);
-
-    const wpmData = profile.runs.slice(-20).map(r => r.wpm);
-    if (wpmData.length >= 2) {
-      this.drawSparkline(c, wpmData, cx - 80, y, 160, 30, C.COLOR_CANNON, 'WPM TREND');
-      y += 56;
-    } else {
-      y += 8;
-    }
-
-    if (false && canRevive) {
-      const bw = 260, bh = 40;
-      c.fillStyle = C.COLOR_ENEMY_POWERUP; c.shadowColor = C.COLOR_ENEMY_POWERUP; c.shadowBlur = 20;
-      c.beginPath(); c.roundRect(cx - bw / 2, y, bw, bh, 8); c.fill(); c.shadowBlur = 0;
-      c.fillStyle = '#000'; c.font = 'bold 14px "Courier New", monospace'; c.textAlign = 'center';
-      c.fillText('\u25B6 WATCH AD TO REVIVE', cx, y + bh / 2 + 1);
-      y += bh + 14;
-    }
 
     if (Math.sin(Date.now() / 300) > 0) {
       c.fillStyle = 'rgba(200,210,230,0.7)';
