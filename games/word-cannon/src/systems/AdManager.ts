@@ -10,6 +10,9 @@ declare global {
         game: {
           gameplayStart(): void;
           gameplayStop(): void;
+          settings: { muteAudio: boolean };
+          addSettingsChangeListener(cb: (settings: { muteAudio: boolean }) => void): void;
+          removeSettingsChangeListener(cb: (settings: { muteAudio: boolean }) => void): void;
         };
         ad: {
           requestAd(
@@ -32,13 +35,23 @@ export class AdManager {
   private deathCount = 0;
   private reviveUsed = false;
 
-  async init(): Promise<void> {
+  async init(onMuteChange?: (muted: boolean) => void): Promise<void> {
     try {
       this.sdk = window.CrazyGames;
       if (this.sdk) {
         await this.sdk.SDK.init();
         this.ready = true;
         console.log('[AdManager] CrazyGames SDK initialized');
+
+        // Respect the platform's initial mute state
+        if (onMuteChange) {
+          const initial = this.sdk.SDK.game.settings?.muteAudio;
+          if (initial) onMuteChange(true);
+
+          this.sdk.SDK.game.addSettingsChangeListener((settings) => {
+            onMuteChange(settings.muteAudio);
+          });
+        }
       } else {
         console.log('[AdManager] No SDK found — running in local mode');
       }

@@ -9,6 +9,7 @@ export class AudioManager {
     if (!this.ctx) {
       this.ctx = new AudioContext();
       this.masterGain = this.ctx.createGain();
+      this.masterGain.gain.value = this.muted ? 0 : 1;
       this.masterGain.connect(this.ctx.destination);
     }
     if (this.ctx.state === 'suspended') {
@@ -22,11 +23,15 @@ export class AudioManager {
     return this.masterGain!;
   }
 
-  toggleMute(): boolean {
-    this.muted = !this.muted;
+  setMuted(muted: boolean): void {
+    this.muted = muted;
     if (this.masterGain) {
       this.masterGain.gain.value = this.muted ? 0 : 1;
     }
+  }
+
+  toggleMute(): boolean {
+    this.setMuted(!this.muted);
     return this.muted;
   }
 

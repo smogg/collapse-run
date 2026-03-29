@@ -159,7 +159,10 @@ export class Game {
 
     this.profile = this.loadProfile();
     this.setupInput();
-    this.adManager.init();
+  }
+
+  async init(): Promise<void> {
+    await this.adManager.init((muted) => this.audio.setMuted(muted));
   }
 
   private loadProfile(): PlayerProfile {
