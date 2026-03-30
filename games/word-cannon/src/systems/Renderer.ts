@@ -1,4 +1,4 @@
-import { Enemy, Particle, Bullet, ActiveDebuff, ActivePowerup, PlayerProfile, Explosion, LightningArc, Missile, DamageNumber, UpgradeDef, CritSlash } from '../types';
+import { Enemy, Particle, Bullet, ActiveDebuff, ActivePowerup, PlayerProfile, Explosion, LightningArc, Missile, DamageNumber, UpgradeDef, CritSlash, Fragment, InputMode } from '../types';
 import { RunStats, LevelDef, getLevelDef } from '../Game';
 import { ALL_UPGRADES } from '../data/upgrades';
 import * as C from '../config';
@@ -32,8 +32,22 @@ export class Renderer {
   // Upgrade card hit areas
   private upgradeCardBounds: { x: number; y: number; w: number; h: number }[] = [];
 
+  // Fragment mode
+  private fragmentMode = false;
+  private modeButtonBounds: { type: InputMode; x: number; y: number; w: number; h: number }[] = [];
+
+  // Fragment grid layout constants
+  private readonly FRAG_CELL_W = 70;
+  private readonly FRAG_CELL_H = 44;
+  private readonly FRAG_PADDING = 8;
+  private readonly FRAG_COLS = 10;
+
   get w(): number { return this._w; }
   get h(): number { return this._h; }
+  /** Effective play area height — shorter in fragment mode to make room for the tap grid */
+  get gameH(): number {
+    return this.fragmentMode ? Math.floor(this._h * (1 - C.FRAGMENT_AREA_HEIGHT)) : this._h;
+  }
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -459,7 +473,7 @@ export class Renderer {
     const badgeSize = 24;
     const gap = 6;
     let bx = 12;
-    const by = this._h - 70;
+    const by = this.gameH - 70;
 
     for (const u of owned) {
       const stacks = upgrades.get(u.id) || 0;
@@ -1253,16 +1267,17 @@ export class Renderer {
     }
 
     // Typed buffer
+    const bottomRef = this.gameH;
     if (typedBuffer.length > 0) {
       c.font = 'bold 26px "Courier New", monospace';
       c.textAlign = 'center';
       c.fillStyle = C.COLOR_CANNON; c.shadowColor = C.COLOR_CANNON; c.shadowBlur = 12;
-      c.fillText(typedBuffer, this._w / 2, this._h - 24);
+      c.fillText(typedBuffer, this._w / 2, bottomRef - 24);
       c.shadowBlur = 0;
     }
 
     // Active effects
-    const effectY = this._h - 70;
+    const effectY = bottomRef - 70;
     let ex = 16;
     const effectH = 28, effectR = 6;
     c.textBaseline = 'middle';
@@ -1537,11 +1552,152 @@ export class Renderer {
       c.fillText(line, cx, cardY + 22 + i * 22);
     });
 
-    if (Math.sin(now / 300) > 0) {
-      c.fillStyle = C.COLOR_COMBO; c.shadowColor = C.COLOR_COMBO; c.shadowBlur = 10;
-      c.font = 'bold 18px "Courier New", monospace';
-      c.fillText('PRESS ANY KEY TO START', cx, this._h * 0.85);
+    // Mode selection buttons
+    const btnY = this._h * 0.82;
+    const btnW = 160, btnH = 44, gap = 24;
+    const btnTypeX = cx - btnW - gap / 2;
+    const btnTapX = cx + gap / 2;
+
+    this.modeButtonBounds = [
+      { type: 'keyboard' as InputMode, x: btnTypeX, y: btnY, w: btnW, h: btnH },
+      { type: 'fragments' as InputMode, x: btnTapX, y: btnY, w: btnW, h: btnH },
+    ];
+
+    const pulse = 0.7 + 0.3 * Math.sin(now / 300);
+
+    // TYPE button
+    c.fillStyle = `rgba(0, 255, 170, ${0.08 * pulse})`;
+    c.strokeStyle = `rgba(0, 255, 170, ${0.5 * pulse})`;
+    c.lineWidth = 2;
+    c.beginPath(); c.roundRect(btnTypeX, btnY, btnW, btnH, 10); c.fill(); c.stroke();
+    c.fillStyle = C.COLOR_CANNON;
+    c.font = 'bold 18px "Courier New", monospace';
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText('TYPE (T)', btnTypeX + btnW / 2, btnY + btnH / 2);
+
+    // TAP button
+    c.fillStyle = `rgba(255, 200, 0, ${0.08 * pulse})`;
+    c.strokeStyle = `rgba(255, 200, 0, ${0.5 * pulse})`;
+    c.lineWidth = 2;
+    c.beginPath(); c.roundRect(btnTapX, btnY, btnW, btnH, 10); c.fill(); c.stroke();
+    c.fillStyle = C.COLOR_COMBO;
+    c.font = 'bold 18px "Courier New", monospace';
+    c.fillText('TAP (F)', btnTapX + btnW / 2, btnY + btnH / 2);
+
+    c.fillStyle = 'rgba(160,180,220,0.35)';
+    c.font = '11px "Courier New", monospace';
+    c.textBaseline = 'alphabetic';
+    c.fillText('keyboard', btnTypeX + btnW / 2, btnY + btnH + 16);
+    c.fillText('mobile / touch', btnTapX + btnW / 2, btnY + btnH + 16);
+  }
+
+  setFragmentMode(enabled: boolean): void {
+    this.fragmentMode = enabled;
+  }
+
+  getModeButtonClicked(gx: number, gy: number): InputMode | null {
+    for (const b of this.modeButtonBounds) {
+      if (gx >= b.x && gx <= b.x + b.w && gy >= b.y && gy <= b.y + b.h) {
+        return b.type;
+      }
+    }
+    return null;
+  }
+
+  getFragmentAtPosition(gx: number, gy: number, fragments: Fragment[]): Fragment | null {
+    const areaTop = this._h * (1 - C.FRAGMENT_AREA_HEIGHT);
+    const gridX = this.FRAG_PADDING;
+    const cols = this.FRAG_COLS;
+
+    for (const f of fragments) {
+      if (!f.active || f.fadeOut > 0) continue;
+      const col = f.slotIndex % cols;
+      const row = Math.floor(f.slotIndex / cols);
+      const fx = gridX + col * (this.FRAG_CELL_W + this.FRAG_PADDING);
+      const fy = areaTop + this.FRAG_PADDING + row * (this.FRAG_CELL_H + this.FRAG_PADDING);
+      if (gx >= fx && gx <= fx + this.FRAG_CELL_W && gy >= fy && gy <= fy + this.FRAG_CELL_H) {
+        return f;
+      }
+    }
+    return null;
+  }
+
+  drawFragments(fragments: Fragment[], targetEnemyId: number, nextFragId: number, now: number): void {
+    const c = this.ctx;
+    const areaTop = this._h * (1 - C.FRAGMENT_AREA_HEIGHT);
+
+    // Background for fragment area
+    c.fillStyle = 'rgba(4, 4, 15, 0.85)';
+    c.fillRect(0, areaTop, this._w, this._h * C.FRAGMENT_AREA_HEIGHT);
+    c.strokeStyle = 'rgba(100, 180, 255, 0.15)';
+    c.lineWidth = 1;
+    c.beginPath();
+    c.moveTo(0, areaTop);
+    c.lineTo(this._w, areaTop);
+    c.stroke();
+
+    const gridX = this.FRAG_PADDING;
+    const cols = this.FRAG_COLS;
+
+    for (const f of fragments) {
+      if (!f.active && f.fadeOut === 0) continue;
+
+      const col = f.slotIndex % cols;
+      const row = Math.floor(f.slotIndex / cols);
+      const fx = gridX + col * (this.FRAG_CELL_W + this.FRAG_PADDING);
+      const fy = areaTop + this.FRAG_PADDING + row * (this.FRAG_CELL_H + this.FRAG_PADDING);
+
+      // Calculate opacity for fading
+      let alpha = 1;
+      if (f.fadeOut > 0) {
+        alpha = Math.max(0, 1 - (now - f.fadeOut) / C.FRAGMENT_FADE_DURATION);
+        if (alpha <= 0) continue;
+      }
+
+      // Determine style
+      const isNext = f.id === nextFragId;
+      const isForTarget = f.enemyId === targetEnemyId;
+      const pulse = isNext ? 0.7 + 0.3 * Math.sin(now / 150) : 1;
+
+      // Background
+      if (isNext) {
+        c.fillStyle = `rgba(0, 255, 170, ${0.25 * alpha * pulse})`;
+        c.shadowColor = C.COLOR_CANNON;
+        c.shadowBlur = 12 * pulse;
+      } else if (isForTarget) {
+        c.fillStyle = `rgba(0, 255, 170, ${0.12 * alpha})`;
+        c.shadowBlur = 0;
+      } else {
+        c.fillStyle = `rgba(255, 255, 255, ${0.06 * alpha})`;
+        c.shadowBlur = 0;
+      }
+      c.beginPath();
+      c.roundRect(fx, fy, this.FRAG_CELL_W, this.FRAG_CELL_H, 8);
+      c.fill();
+
+      // Border
+      if (isNext) {
+        c.strokeStyle = `rgba(0, 255, 170, ${0.8 * alpha * pulse})`;
+        c.lineWidth = 2;
+      } else {
+        c.strokeStyle = `rgba(255, 255, 255, ${0.12 * alpha})`;
+        c.lineWidth = 1;
+      }
+      c.beginPath();
+      c.roundRect(fx, fy, this.FRAG_CELL_W, this.FRAG_CELL_H, 8);
+      c.stroke();
       c.shadowBlur = 0;
+
+      // Text
+      c.font = 'bold 18px "Courier New", monospace';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillStyle = isNext
+        ? `rgba(0, 255, 170, ${alpha * pulse})`
+        : isForTarget
+          ? `rgba(200, 255, 230, ${0.8 * alpha})`
+          : `rgba(255, 255, 255, ${0.6 * alpha})`;
+      c.fillText(f.text, fx + this.FRAG_CELL_W / 2, fy + this.FRAG_CELL_H / 2);
     }
   }
 

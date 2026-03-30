@@ -97,3 +97,12 @@ export const GRAVITY_SLOW = [0.06, 0.12, 0.18, 0.24, 0.30];
 export const SHIELD_PAUSE_DURATION = [1000, 1500, 2000, 2500, 3000];
 // Combo Crits: max crit chance from combo per stack level
 export const COMBO_CRIT_MAX = [0.15, 0.30, 0.45, 0.60, 0.80];
+
+// Fragment mode (mobile tap controls)
+export const FRAGMENT_MIN_SIZE = 1;
+export const FRAGMENT_MAX_SIZE = 3;
+export const FRAGMENT_PREFER_SIZE = 2;
+export const FRAGMENT_MAX_WORDS = 6;          // max enemies with fragments shown
+export const FRAGMENT_AREA_HEIGHT = 0.35;     // fraction of game height
+export const FRAGMENT_MODE_SPEED_MULT = 0.85; // enemies slower in fragment mode
+export const FRAGMENT_FADE_DURATION = 300;    // ms for fragment fade out
