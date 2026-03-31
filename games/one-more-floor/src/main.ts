@@ -1,6 +1,52 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
+// ══════════════════════════════════════════════════════════════
+// GAME CONFIG — tweak all balance numbers here
+// ══════════════════════════════════════════════════════════════
+const CONFIG = {
+  // Economy
+  baseRent: 1,              // rent per floor with no upgrades
+  incomeTickRate: 0.1,      // minimum money increment
+
+  // Floors
+  floorBaseCost: 25,        // first floor costs this
+  floorCostScale: 1.55,     // each floor costs this × more
+  perFloorCap: 10,          // per-floor UI phase ends here
+
+  // Occupancy
+  occupancyCheckInterval: 1.5,  // seconds between occupancy updates
+  occupancyCoverageThreshold: 0.4, // coverage ratio for full occupancy
+
+  // Amenities (per-floor upgrades)
+  amenities: [
+    { id: 'hotwater', name: 'Hot Water', icon: '🚿', rentBonus: 1,  baseCost: 8,   costScale: 1.06, unlockFloors: 1 },
+    { id: 'heating',  name: 'Heating',   icon: '🔥', rentBonus: 2,  baseCost: 20,  costScale: 1.08, unlockFloors: 1 },
+    { id: 'ac',       name: 'AC',        icon: '❄️', rentBonus: 3,  baseCost: 50,  costScale: 1.10, unlockFloors: 3 },
+    { id: 'balcony',  name: 'Balcony',   icon: '🌿', rentBonus: 5,  baseCost: 120, costScale: 1.12, unlockFloors: 5 },
+    { id: 'laundry',  name: 'Laundry',   icon: '👕', rentBonus: 4,  baseCost: 200, costScale: 1.14, unlockFloors: 8 },
+    { id: 'gym',      name: 'Gym',       icon: '💪', rentBonus: 7,  baseCost: 500, costScale: 1.16, unlockFloors: 12 },
+  ],
+
+  // Neighborhood upgrades
+  neighborhood: [
+    { id: 'streetlight', name: 'Streetlight',   icon: '💡', rentBonusPerFloor: 0.3,  ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 40,  costScale: 1.35, maxCount: 50,  unlockFloors: 2 },
+    { id: 'tree',        name: 'Tree',          icon: '🌳', rentBonusPerFloor: 0.2,  ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 20,  costScale: 1.30, maxCount: 50,  unlockFloors: 1 },
+    { id: 'bench',       name: 'Park Bench',    icon: '🪑', rentBonusPerFloor: 0.15, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 35,  costScale: 1.32, maxCount: 30,  unlockFloors: 3 },
+    { id: 'parking',     name: 'Parking Space', icon: '🅿️', rentBonusPerFloor: 0.5,  ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 150, costScale: 1.30, maxCount: 100, unlockFloors: 5 },
+    { id: 'cafe',        name: 'Café',          icon: '☕', rentBonusPerFloor: 0.5,  ownIncome: 5,   ownIncomeFloorScale: 0.5, baseCost: 800, costScale: 1.40, maxCount: 20,  unlockFloors: 8 },
+    { id: 'fountain',    name: 'Fountain',      icon: '⛲', rentBonusPerFloor: 1.0,  ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 500, costScale: 1.38, maxCount: 20,  unlockFloors: 6 },
+    { id: 'playground',  name: 'Playground',    icon: '🎠', rentBonusPerFloor: 0.7,  ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 350, costScale: 1.35, maxCount: 20,  unlockFloors: 4 },
+  ],
+
+  // Visuals
+  moneyPopInterval: 2,       // seconds between money pops
+  moneyPopDuration: 1400,    // ms per pop animation
+  uiUpdateInterval: 0.15,    // seconds between DOM content updates
+};
+
+// ══════════════════════════════════════════════════════════════
+
 // ── Game State ──────────────────────────────────────────────
 interface AmenityDef {
   id: string;
@@ -38,8 +84,8 @@ interface GameState {
   floorAmenities: Set<string>[]; // per-floor: which amenities are installed
 }
 
-const BASE_RENT = 1;
-const PER_FLOOR_CAP = 10; // per-floor UI phase ends here
+const BASE_RENT = CONFIG.baseRent;
+const PER_FLOOR_CAP = CONFIG.perFloorCap;
 
 const state: GameState = {
   money: 0,
@@ -48,104 +94,54 @@ const state: GameState = {
   floorAmenities: [new Set()], // floor 0
 };
 
-const amenities: AmenityDef[] = [
-  { id: 'hotwater', name: 'Hot Water', icon: '\u{1F6BF}', rentBonus: 1, baseCost: 8, costScale: 1.06, totalInstalled: 0, unlockFloors: 1 },
-  { id: 'heating', name: 'Heating', icon: '\u{1F525}', rentBonus: 2, baseCost: 20, costScale: 1.08, totalInstalled: 0, unlockFloors: 1 },
-  { id: 'ac', name: 'AC', icon: '\u{2744}\u{FE0F}', rentBonus: 3, baseCost: 50, costScale: 1.10, totalInstalled: 0, unlockFloors: 3 },
-  { id: 'balcony', name: 'Balcony', icon: '\u{1F33F}', rentBonus: 5, baseCost: 120, costScale: 1.12, totalInstalled: 0, unlockFloors: 5 },
-  { id: 'laundry', name: 'Laundry', icon: '\u{1F455}', rentBonus: 4, baseCost: 200, costScale: 1.14, totalInstalled: 0, unlockFloors: 8 },
-  { id: 'gym', name: 'Gym', icon: '\u{1F4AA}', rentBonus: 7, baseCost: 500, costScale: 1.16, totalInstalled: 0, unlockFloors: 12 },
-];
+const amenities: AmenityDef[] = CONFIG.amenities.map(a => ({ ...a, totalInstalled: 0 }));
 
 // ── Neighborhood Upgrades ───────────────────────────────────
-const neighborhoodUpgrades: NeighborhoodDef[] = [
-  {
-    id: 'streetlight', name: 'Streetlight', icon: '💡',
-    description: 'Lights up the street',
-    model: 'models/light-curved.glb',
-    rentBonusPerFloor: 0.3, ownIncome: 0, ownIncomeFloorScale: 0,
-    baseCost: 40, costScale: 1.35, maxCount: 50, count: 0, unlockFloors: 2,
-    positions: [
-      { x: -1.5, y: 0, z: 1.8, ry: 0 }, { x: 1.5, y: 0, z: 1.8, ry: Math.PI },
-      { x: -3, y: 0, z: 1.8, ry: 0 }, { x: 3, y: 0, z: 1.8, ry: Math.PI },
-      { x: -4.5, y: 0, z: 1.8, ry: 0 }, { x: 4.5, y: 0, z: 1.8, ry: Math.PI },
-      { x: -6, y: 0, z: 1.8, ry: 0 }, { x: 6, y: 0, z: 1.8, ry: Math.PI },
-    ],
-  },
-  {
-    id: 'tree', name: 'Tree', icon: '🌳',
-    description: 'Green and pleasant',
-    model: 'models/tree-large.glb',
-    rentBonusPerFloor: 0.2, ownIncome: 0, ownIncomeFloorScale: 0,
-    baseCost: 20, costScale: 1.3, maxCount: 50, count: 0, unlockFloors: 1,
-    positions: [
-      { x: -1.2, y: 0, z: -0.3, ry: 0 }, { x: 1.2, y: 0, z: -0.3, ry: 0.5 },
-      { x: -2, y: 0, z: 0.3, ry: 1 }, { x: 2, y: 0, z: 0.3, ry: 1.5 },
-      { x: -2.5, y: 0, z: -0.8, ry: 2 }, { x: 2.5, y: 0, z: -0.8, ry: 0.3 },
-      { x: -1.5, y: 0, z: -1.2, ry: 3 }, { x: 1.5, y: 0, z: -1.2, ry: 2 },
-      { x: -3, y: 0, z: -0.2, ry: 1 }, { x: 3, y: 0, z: -0.2, ry: 2 },
-      { x: 0, y: 0, z: -1.5, ry: 0 }, { x: 0, y: 0, z: -2.2, ry: 1 },
-    ],
-  },
-  {
-    id: 'bench', name: 'Park Bench', icon: '🪑',
-    description: 'A place to sit',
-    model: 'models/planter.glb', // using planter as bench stand-in
-    rentBonusPerFloor: 0.15, ownIncome: 0, ownIncomeFloorScale: 0,
-    baseCost: 35, costScale: 1.32, maxCount: 30, count: 0, unlockFloors: 3,
-    scaleOverride: 0.8,
-    positions: [
-      { x: -1.5, y: 0, z: -0.8, ry: 0.3 }, { x: 1.5, y: 0, z: -0.8, ry: -0.3 },
-      { x: -2.5, y: 0, z: 0, ry: 0 }, { x: 2.5, y: 0, z: 0, ry: Math.PI },
-      { x: -0.8, y: 0, z: -1.5, ry: 0.5 }, { x: 0.8, y: 0, z: -1.5, ry: -0.5 },
-    ],
-  },
-  {
-    id: 'parking', name: 'Parking Space', icon: '🅿️',
-    description: 'Underground parking',
-    model: null, // no visual, just occupancy bonus
-    rentBonusPerFloor: 0.5, ownIncome: 0, ownIncomeFloorScale: 0,
-    baseCost: 150, costScale: 1.3, maxCount: 100, count: 0, unlockFloors: 5,
-    positions: [],
-  },
-  {
-    id: 'cafe', name: 'Café', icon: '☕',
-    description: 'Earns income from tenants',
-    model: 'models/building-type-h.glb',
-    rentBonusPerFloor: 0.5, ownIncome: 5, ownIncomeFloorScale: 0.5,
-    baseCost: 800, costScale: 1.4, maxCount: 20, count: 0, unlockFloors: 8,
-    scaleOverride: 0.5,
-    positions: [
-      { x: 2.5, y: 0, z: 0.5, ry: -0.3 },
-      { x: -2.5, y: 0, z: 0.5, ry: 0.3 },
-      { x: 3.5, y: 0, z: -0.5, ry: -0.5 },
-    ],
-  },
-  {
-    id: 'fountain', name: 'Fountain', icon: '⛲',
-    description: 'Beautiful centerpiece',
-    model: null, // procedural
-    rentBonusPerFloor: 1, ownIncome: 0, ownIncomeFloorScale: 0,
-    baseCost: 500, costScale: 1.38, maxCount: 20, count: 0, unlockFloors: 6,
-    positions: [
-      { x: 0, y: 0, z: -1.8, ry: 0 },
-      { x: -2, y: 0, z: -2, ry: 0 },
-      { x: 2, y: 0, z: -2, ry: 0 },
-    ],
-  },
-  {
-    id: 'playground', name: 'Playground', icon: '🎠',
-    description: 'Families love it',
-    model: null, // procedural
-    rentBonusPerFloor: 0.7, ownIncome: 0, ownIncomeFloorScale: 0,
-    baseCost: 350, costScale: 1.35, maxCount: 20, count: 0, unlockFloors: 4,
-    positions: [
-      { x: -2, y: 0, z: -1, ry: 0 },
-      { x: 2.5, y: 0, z: -1.5, ry: 0 },
-      { x: -3, y: 0, z: -1.5, ry: 0 },
-    ],
-  },
-];
+// Visual data for neighborhood items (not balance — balance is in CONFIG)
+const HOOD_VISUALS: Record<string, { description: string; model: string | null; scaleOverride?: number; positions: { x: number; y: number; z: number; ry: number }[] }> = {
+  streetlight: { description: 'Lights up the street', model: 'models/light-curved.glb', positions: [
+    { x: -1.5, y: 0, z: 1.8, ry: 0 }, { x: 1.5, y: 0, z: 1.8, ry: Math.PI },
+    { x: -3, y: 0, z: 1.8, ry: 0 }, { x: 3, y: 0, z: 1.8, ry: Math.PI },
+    { x: -4.5, y: 0, z: 1.8, ry: 0 }, { x: 4.5, y: 0, z: 1.8, ry: Math.PI },
+    { x: -6, y: 0, z: 1.8, ry: 0 }, { x: 6, y: 0, z: 1.8, ry: Math.PI },
+  ]},
+  tree: { description: 'Green and pleasant', model: 'models/tree-large.glb', positions: [
+    { x: -1.2, y: 0, z: -0.3, ry: 0 }, { x: 1.2, y: 0, z: -0.3, ry: 0.5 },
+    { x: -2, y: 0, z: 0.3, ry: 1 }, { x: 2, y: 0, z: 0.3, ry: 1.5 },
+    { x: -2.5, y: 0, z: -0.8, ry: 2 }, { x: 2.5, y: 0, z: -0.8, ry: 0.3 },
+    { x: -1.5, y: 0, z: -1.2, ry: 3 }, { x: 1.5, y: 0, z: -1.2, ry: 2 },
+    { x: -3, y: 0, z: -0.2, ry: 1 }, { x: 3, y: 0, z: -0.2, ry: 2 },
+    { x: 0, y: 0, z: -1.5, ry: 0 }, { x: 0, y: 0, z: -2.2, ry: 1 },
+  ]},
+  bench: { description: 'A place to sit', model: 'models/planter.glb', scaleOverride: 0.8, positions: [
+    { x: -1.5, y: 0, z: -0.8, ry: 0.3 }, { x: 1.5, y: 0, z: -0.8, ry: -0.3 },
+    { x: -2.5, y: 0, z: 0, ry: 0 }, { x: 2.5, y: 0, z: 0, ry: Math.PI },
+    { x: -0.8, y: 0, z: -1.5, ry: 0.5 }, { x: 0.8, y: 0, z: -1.5, ry: -0.5 },
+  ]},
+  parking: { description: 'Underground parking', model: null, positions: [] },
+  cafe: { description: 'Earns income from tenants', model: 'models/building-type-h.glb', scaleOverride: 0.5, positions: [
+    { x: 2.5, y: 0, z: 0.5, ry: -0.3 }, { x: -2.5, y: 0, z: 0.5, ry: 0.3 }, { x: 3.5, y: 0, z: -0.5, ry: -0.5 },
+  ]},
+  fountain: { description: 'Beautiful centerpiece', model: null, positions: [
+    { x: 0, y: 0, z: -1.8, ry: 0 }, { x: -2, y: 0, z: -2, ry: 0 }, { x: 2, y: 0, z: -2, ry: 0 },
+  ]},
+  playground: { description: 'Families love it', model: null, positions: [
+    { x: -2, y: 0, z: -1, ry: 0 }, { x: 2.5, y: 0, z: -1.5, ry: 0 }, { x: -3, y: 0, z: -1.5, ry: 0 },
+  ]},
+};
+
+// Build neighborhood upgrades by merging CONFIG balance with visuals
+const neighborhoodUpgrades: NeighborhoodDef[] = CONFIG.neighborhood.map(cfg => {
+  const vis = HOOD_VISUALS[cfg.id];
+  return {
+    ...cfg,
+    description: vis.description,
+    model: vis.model,
+    scaleOverride: vis.scaleOverride,
+    positions: vis.positions,
+    count: 0,
+  };
+});
 
 const neighborhoodModels: THREE.Object3D[] = []; // spawned 3D models
 
@@ -298,7 +294,7 @@ function getTargetOccupancy(): number {
   const maxInstalls = state.floors * unlocked.length;
   const coverage = totalInstalls / maxInstalls;
 
-  const occupancyRatio = Math.min(1, coverage / 0.4);
+  const occupancyRatio = Math.min(1, coverage / CONFIG.occupancyCoverageThreshold);
   return Math.max(1, Math.round(state.floors * occupancyRatio));
 }
 
@@ -312,10 +308,15 @@ function allFloorsFullyUpgraded(): boolean {
   return true;
 }
 
+let bulkPhaseUnlocked = false; // once unlocked, stays unlocked forever
+
 function isInBulkPhase(): boolean {
-  // Past the cap = already passed the gate, always bulk
-  // At the cap = bulk only if all maxed
-  return state.floors > PER_FLOOR_CAP || (state.floors === PER_FLOOR_CAP && allFloorsFullyUpgraded());
+  if (bulkPhaseUnlocked) return true;
+  if (state.floors >= PER_FLOOR_CAP && allFloorsFullyUpgraded()) {
+    bulkPhaseUnlocked = true;
+    return true;
+  }
+  return false;
 }
 
 // How many floors are missing a given amenity
@@ -345,12 +346,10 @@ function getAmenityCost(a: AmenityDef): number {
   return Math.floor(a.baseCost * Math.pow(a.costScale, a.totalInstalled));
 }
 
-const floorBaseCost = 25;
-const floorCostScale = 1.55;
 let floorsPurchased = 0;
 
 function getFloorCost(): number {
-  return Math.floor(floorBaseCost * Math.pow(floorCostScale, floorsPurchased));
+  return Math.floor(CONFIG.floorBaseCost * Math.pow(CONFIG.floorCostScale, floorsPurchased));
 }
 
 // ── Three.js Setup ──────────────────────────────────────────
@@ -577,7 +576,7 @@ interface MoneyPop {
 }
 
 const activePops: MoneyPop[] = [];
-const POP_DURATION = 1400; // ms
+const POP_DURATION = CONFIG.moneyPopDuration;
 
 function spawnMoneyPop(floorIndex: number) {
   // Spawn from the RIGHT side of the building
@@ -633,7 +632,7 @@ function updateMoneyPops() {
 }
 
 let popTimer = 0;
-const POP_INTERVAL = 2; // seconds between pops
+const POP_INTERVAL = CONFIG.moneyPopInterval;
 
 function tickMoneyPops(delta: number) {
   popTimer += delta;
@@ -816,8 +815,8 @@ function formatMoney(n: number): string {
 const floorBtn = document.createElement('button');
 floorBtn.className = 'shop-btn floor-btn';
 floorBtn.addEventListener('click', () => {
-  // Block adding floors beyond cap if not all maxed
-  if (state.floors >= PER_FLOOR_CAP && !allFloorsFullyUpgraded()) return;
+  // Block at floor 10 until initial upgrades are done — after that, free to build
+  if (state.floors >= PER_FLOOR_CAP && !bulkPhaseUnlocked) return;
   const cost = getFloorCost();
   if (state.money >= cost) {
     state.money -= cost;
@@ -950,7 +949,7 @@ function renderUI() {
 
   // ── Phase logic ──
   const bulk = isInBulkPhase();
-  const atCap = state.floors >= PER_FLOOR_CAP && !allFloorsFullyUpgraded();
+  const atCap = state.floors >= PER_FLOOR_CAP && !bulkPhaseUnlocked;
 
   // Floor button
   const floorCost = getFloorCost();
@@ -1033,7 +1032,7 @@ let lastTime = performance.now();
 let incomeAccumulator = 0;
 let occupancyTimer = 0;
 let uiTimer = 0;
-const UI_INTERVAL = 0.15; // update DOM ~7fps
+const UI_INTERVAL = CONFIG.uiUpdateInterval;
 let needsRender = true; // flag for Three.js re-render
 
 // Mark scene dirty when something visual changes
@@ -1056,7 +1055,7 @@ function gameLoop(time: number) {
 
   // ── Occupancy tick ──
   occupancyTimer += delta;
-  if (occupancyTimer >= 1.5) {
+  if (occupancyTimer >= CONFIG.occupancyCheckInterval) {
     occupancyTimer = 0;
     const target = getTargetOccupancy();
     if (state.occupied < target) {
@@ -1115,6 +1114,18 @@ window.addEventListener('resize', () => {
 // ── Init ────────────────────────────────────────────────────
 (window as any).cheat = (money: number) => {
   state.money = money;
+  renderUI();
+};
+
+(window as any).maxFloors = () => {
+  for (let i = 0; i < state.floors; i++) {
+    for (const a of amenities) {
+      if (state.floors >= a.unlockFloors && !state.floorAmenities[i].has(a.id)) {
+        state.floorAmenities[i].add(a.id);
+        a.totalInstalled++;
+      }
+    }
+  }
   renderUI();
 };
 
