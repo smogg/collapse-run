@@ -15,18 +15,18 @@ const CONFIG = {
   perFloorCap: 10,          // per-floor UI phase ends here
 
   // Tenants
-  baseFillRate: 0.05,        // base tenants arriving per second (across whole building)
+  baseFillRate: 0.02,        // base tenants arriving per second (across whole building)
   baseChurnRate: 0.02,       // base chance per tenant per minute to leave
   amenityChurnReduction: 0.003, // each installed amenity reduces churn by this much
-  studioBaseCost: 30000,     // base cost of studio conversion (comparable to full gym install)
+  studioBaseCost: 150000,    // base cost of studio conversion
   studioCostScale: 50,       // each studio level costs 50x more
   maxStudioLevel: 4,         // max studio upgrades per floor
 
   // Ads (temporary boost, click-heavy)
   adCost: 5,                 // flat cost per click
-  adBoostPerClick: 0.15,     // each click adds this to fill rate
+  adBoostPerClick: 0.03,     // each click adds this to fill rate
   adBoostMaxDuration: 30,    // timer caps at 30s, doesn't stack beyond
-  adMaxBoost: 3.0,           // max fill rate bonus from ads
+  adMaxBoost: 0.5,           // max fill rate bonus from ads
   adDecayRate: 0.05,         // boost decays this much per second naturally
 
   // Amenities (per-floor upgrades)
@@ -187,10 +187,11 @@ const HOOD_VISUALS: Record<string, { description: string; model: string | null; 
     { x: 0, y: 0, z: 0.45, ry: 0 },
   ]},
   streetlight: { description: 'Lights up the street', model: 'models/light-curved.glb', positions: [
-    { x: -1.8, y: 0, z: 0.8, ry: 0 }, { x: 1.8, y: 0, z: 0.8, ry: 0 },
-    { x: -3.3, y: 0, z: 0.8, ry: 0 }, { x: 3.3, y: 0, z: 0.8, ry: 0 },
-    { x: -4.8, y: 0, z: 0.8, ry: 0 }, { x: 4.8, y: 0, z: 0.8, ry: 0 },
-    { x: -6.3, y: 0, z: 0.8, ry: 0 }, { x: 6.3, y: 0, z: 0.8, ry: 0 },
+    { x: -1.8, y: 0, z: 0.8, ry: Math.PI }, { x: 1.8, y: 0, z: 0.8, ry: Math.PI },
+    { x: -3.3, y: 0, z: 0.8, ry: Math.PI }, { x: 3.3, y: 0, z: 0.8, ry: Math.PI },
+    { x: -4.8, y: 0, z: 0.8, ry: Math.PI }, { x: 4.8, y: 0, z: 0.8, ry: Math.PI },
+    { x: -6.3, y: 0, z: 0.8, ry: Math.PI }, { x: 6.3, y: 0, z: 0.8, ry: Math.PI },
+    { x: -7.8, y: 0, z: 0.8, ry: Math.PI }, { x: 7.8, y: 0, z: 0.8, ry: Math.PI },
   ]},
   tree: { description: 'Green and pleasant', model: 'models/tree-large.glb', positions: [
     { x: -1.2, y: 0, z: -0.3, ry: 0 }, { x: 1.2, y: 0, z: -0.3, ry: 0.5 },
@@ -492,15 +493,28 @@ function getAverageRentPerTenant(): number {
 }
 
 // ── Upgrade Costs ────────────────────────────────────────────
+// Amenity cost tiers as multiplier of floor cost (per apartment)
+// Hot Water = 0.15x, Heating = 0.25x, AC = 0.4x, Balcony = 0.6x, Laundry = 0.8x, Gym = 1.2x
+const AMENITY_FLOOR_COST_RATIO: Record<string, number> = {
+  hotwater: 0.15,
+  heating: 0.25,
+  ac: 0.4,
+  balcony: 0.6,
+  laundry: 0.8,
+  gym: 1.2,
+};
+
 function getAmenityCostPerUnit(a: AmenityDef, floorIndex: number): number {
   const floor = state.floorStates[floorIndex];
-  // Cost scales with floor cost: on floor N, amenity costs (1 + N*0.5) × floorCost fraction
-  const floorCost = Math.floor(CONFIG.floorBaseCost * Math.pow(CONFIG.floorCostScale, Math.max(0, floorIndex)));
-  const floorScaleFactor = (1 + floorIndex * 0.5); // 1x on floor 0, 1.5x on floor 1, 2x on floor 2...
   const studioMultiplier = floor ? Math.pow(5, floor.studioLevel) : 1;
-  // Base cost as a fraction of floor cost, scaled by the amenity's baseCost ratio
-  const amenityFraction = a.baseCost / CONFIG.floorBaseCost; // how much of floor cost this amenity represents
-  return Math.floor(floorCost * amenityFraction * floorScaleFactor * studioMultiplier);
+  if (floorIndex === 0) {
+    // Floor 0: use original cheap baseCosts so early game is playable
+    return Math.floor(a.baseCost * studioMultiplier);
+  }
+  // Floor 1+: costs scale as fraction of floor cost, always expensive
+  const floorCost = Math.floor(CONFIG.floorBaseCost * Math.pow(CONFIG.floorCostScale, floorIndex));
+  const ratio = AMENITY_FLOOR_COST_RATIO[a.id] || 0.3;
+  return Math.floor(floorCost * ratio * studioMultiplier);
 }
 
 // Total cost to install amenity on all remaining apartments on a floor
