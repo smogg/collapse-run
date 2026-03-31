@@ -237,6 +237,7 @@ async function processQueue() {
     buildingGroup.add(roofModel);
 
     updateCamera();
+    markDirty();
   }
 
   isBuilding = false;
@@ -565,6 +566,7 @@ floorBtn.addEventListener('click', () => {
     floorsPurchased++;
     state.floorAmenities.push(new Set());
     addFloorToBuilding();
+    markDirty();
     renderUI();
   }
 });
@@ -605,13 +607,20 @@ function renderUI() {
 let lastTime = performance.now();
 let incomeAccumulator = 0;
 let occupancyTimer = 0;
+let uiTimer = 0;
+const UI_INTERVAL = 0.15; // update DOM ~7fps
+let needsRender = true; // flag for Three.js re-render
+
+// Mark scene dirty when something visual changes
+function markDirty() { needsRender = true; }
 
 function gameLoop(time: number) {
   requestAnimationFrame(gameLoop);
 
-  const delta = (time - lastTime) / 1000;
+  const delta = Math.min((time - lastTime) / 1000, 0.1); // clamp large deltas
   lastTime = time;
 
+  // ── Economy tick (cheap, runs every frame) ──
   const income = getTotalRentPerSecond();
   incomeAccumulator += income * delta;
   if (incomeAccumulator >= 0.1) {
@@ -620,6 +629,7 @@ function gameLoop(time: number) {
     incomeAccumulator -= amount;
   }
 
+  // ── Occupancy tick ──
   occupancyTimer += delta;
   if (occupancyTimer >= 1.5) {
     occupancyTimer = 0;
@@ -627,21 +637,43 @@ function gameLoop(time: number) {
     if (state.occupied < target) {
       state.occupied++;
       spawnTenant(true);
+      markDirty();
     } else if (state.occupied > target) {
       state.occupied--;
       spawnTenant(false);
+      markDirty();
     }
   }
 
-  updateTenants(delta);
+  // ── Tenants (only if active) ──
+  if (activeTenants.length > 0) {
+    updateTenants(delta);
+    markDirty();
+  }
+
+  // ── Money pops (DOM, throttled with the pops themselves) ──
   tickMoneyPops(delta);
-  renderUI();
-  updateFloorPanels();
-  animateCamera();
 
-  buildingGroup.rotation.y = Math.sin(time * 0.0003) * 0.05;
+  // ── DOM updates throttled ──
+  uiTimer += delta;
+  if (uiTimer >= UI_INTERVAL) {
+    uiTimer = 0;
+    renderUI();
+    updateFloorPanels();
+  }
 
-  renderer.render(scene, camera);
+  // ── Camera animation ──
+  const camDist = camera.position.distanceTo(cameraTargetPos);
+  if (camDist > 0.01) {
+    animateCamera();
+    markDirty();
+  }
+
+  // ── Only render when needed ──
+  if (needsRender) {
+    renderer.render(scene, camera);
+    needsRender = false;
+  }
 }
 
 // ── Resize Handler ──────────────────────────────────────────
@@ -649,6 +681,7 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  markDirty();
 });
 
 // ── Init ────────────────────────────────────────────────────
