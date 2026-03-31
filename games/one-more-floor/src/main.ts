@@ -20,12 +20,12 @@ const CONFIG = {
 
   // Amenities (per-floor upgrades)
   amenities: [
-    { id: 'hotwater', name: 'Hot Water', icon: '🚿', rentBonus: 2,  baseCost: 8,   costScale: 1.08, unlockFloors: 1 },
-    { id: 'heating',  name: 'Heating',   icon: '🔥', rentBonus: 3,  baseCost: 25,  costScale: 1.10, unlockFloors: 1 },
-    { id: 'ac',       name: 'AC',        icon: '❄️', rentBonus: 5,  baseCost: 60,  costScale: 1.12, unlockFloors: 3 },
-    { id: 'balcony',  name: 'Balcony',   icon: '🌿', rentBonus: 8,  baseCost: 150, costScale: 1.14, unlockFloors: 5 },
-    { id: 'laundry',  name: 'Laundry',   icon: '👕', rentBonus: 6,  baseCost: 250, costScale: 1.16, unlockFloors: 8 },
-    { id: 'gym',      name: 'Gym',       icon: '💪', rentBonus: 12, baseCost: 600, costScale: 1.18, unlockFloors: 12 },
+    { id: 'hotwater', name: 'Hot Water', icon: '🚿', rentBonus: 2,  baseCost: 80,   costScale: 1.15, unlockFloors: 1 },
+    { id: 'heating',  name: 'Heating',   icon: '🔥', rentBonus: 3,  baseCost: 250,  costScale: 1.18, unlockFloors: 1 },
+    { id: 'ac',       name: 'AC',        icon: '❄️', rentBonus: 5,  baseCost: 600,  costScale: 1.20, unlockFloors: 3 },
+    { id: 'balcony',  name: 'Balcony',   icon: '🌿', rentBonus: 8,  baseCost: 1500, costScale: 1.22, unlockFloors: 5 },
+    { id: 'laundry',  name: 'Laundry',   icon: '👕', rentBonus: 6,  baseCost: 2500, costScale: 1.24, unlockFloors: 8 },
+    { id: 'gym',      name: 'Gym',       icon: '💪', rentBonus: 12, baseCost: 6000, costScale: 1.26, unlockFloors: 12 },
   ],
 
   // Neighborhood upgrades
@@ -118,10 +118,10 @@ const amenities: AmenityDef[] = CONFIG.amenities.map(a => ({ ...a, totalInstalle
 // Visual data for neighborhood items (not balance — balance is in CONFIG)
 const HOOD_VISUALS: Record<string, { description: string; model: string | null; scaleOverride?: number; positions: { x: number; y: number; z: number; ry: number }[] }> = {
   streetlight: { description: 'Lights up the street', model: 'models/light-curved.glb', positions: [
-    { x: -1.5, y: 0, z: 1.8, ry: 0 }, { x: 1.5, y: 0, z: 1.8, ry: Math.PI },
-    { x: -3, y: 0, z: 1.8, ry: 0 }, { x: 3, y: 0, z: 1.8, ry: Math.PI },
-    { x: -4.5, y: 0, z: 1.8, ry: 0 }, { x: 4.5, y: 0, z: 1.8, ry: Math.PI },
-    { x: -6, y: 0, z: 1.8, ry: 0 }, { x: 6, y: 0, z: 1.8, ry: Math.PI },
+    { x: -1.8, y: 0, z: 0.8, ry: 0 }, { x: 1.8, y: 0, z: 0.8, ry: 0 },
+    { x: -3.3, y: 0, z: 0.8, ry: 0 }, { x: 3.3, y: 0, z: 0.8, ry: 0 },
+    { x: -4.8, y: 0, z: 0.8, ry: 0 }, { x: 4.8, y: 0, z: 0.8, ry: 0 },
+    { x: -6.3, y: 0, z: 0.8, ry: 0 }, { x: 6.3, y: 0, z: 0.8, ry: 0 },
   ]},
   tree: { description: 'Green and pleasant', model: 'models/tree-large.glb', positions: [
     { x: -1.2, y: 0, z: -0.3, ry: 0 }, { x: 1.2, y: 0, z: -0.3, ry: 0.5 },
@@ -136,9 +136,15 @@ const HOOD_VISUALS: Record<string, { description: string; model: string | null; 
     { x: -2.5, y: 0, z: 0, ry: 0 }, { x: 2.5, y: 0, z: 0, ry: Math.PI },
     { x: -0.8, y: 0, z: -1.5, ry: 0.5 }, { x: 0.8, y: 0, z: -1.5, ry: -0.5 },
   ]},
-  parking: { description: 'Underground parking', model: null, positions: [] },
+  parking: { description: 'Underground parking', model: 'car', positions: [
+    { x: -2, y: 0, z: 1.5, ry: 0 }, { x: 2, y: 0, z: 1.5, ry: 0 },
+    { x: -3.5, y: 0, z: 1.5, ry: 0 }, { x: 3.5, y: 0, z: 1.5, ry: 0 },
+    { x: -5, y: 0, z: 1.5, ry: 0 }, { x: 5, y: 0, z: 1.5, ry: 0 },
+    { x: -6.5, y: 0, z: 1.5, ry: 0 }, { x: 6.5, y: 0, z: 1.5, ry: 0 },
+    { x: -1, y: 0, z: 1.5, ry: 0 }, { x: 1, y: 0, z: 1.5, ry: 0 },
+  ]},
   cafe: { description: 'Earns income from tenants', model: 'models/building-type-h.glb', scaleOverride: 0.5, positions: [
-    { x: 2.5, y: 0, z: 0.5, ry: -0.3 }, { x: -2.5, y: 0, z: 0.5, ry: 0.3 }, { x: 3.5, y: 0, z: -0.5, ry: -0.5 },
+    { x: 3, y: 0, z: 0.3, ry: 0 }, { x: -3, y: 0, z: 0.3, ry: 0 }, { x: 5, y: 0, z: 0.3, ry: 0 },
   ]},
   fountain: { description: 'Beautiful centerpiece', model: null, positions: [
     { x: 0, y: 0, z: -1.8, ry: 0 }, { x: -2, y: 0, z: -2, ry: 0 }, { x: 2, y: 0, z: -2, ry: 0 },
@@ -235,10 +241,24 @@ function getSpawnPosition(n: NeighborhoodDef): { x: number; y: number; z: number
 async function spawnNeighborhoodModel(n: NeighborhoodDef) {
   if (n.count <= 0) return;
   if (!n.model && !['fountain', 'playground'].includes(n.id)) return;
+
+  // Only spawn a 3D model for first N predefined positions, or every 5th purchase after that
+  if (n.count > n.positions.length && n.count % 5 !== 0) return;
+
   const pos = getSpawnPosition(n);
 
   let obj: THREE.Object3D;
-  if (n.model) {
+  if (n.model === 'car') {
+    // Special case: spawn a parked car
+    const carColors = [0x3366cc, 0xcc3333, 0x33cc33, 0xffcc00, 0xffffff];
+    const color = carColors[Math.floor(Math.random() * carColors.length)];
+    const carMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.25, 0.12, 0.15),
+      new THREE.MeshLambertMaterial({ color })
+    );
+    carMesh.castShadow = true;
+    obj = carMesh;
+  } else if (n.model) {
     obj = await loadModel(n.model);
     if (n.scaleOverride) {
       obj.scale.setScalar(n.scaleOverride);
@@ -247,45 +267,73 @@ async function spawnNeighborhoodModel(n: NeighborhoodDef) {
     // Procedural geometry for fountain/playground
     if (n.id === 'fountain') {
       const group = new THREE.Group();
-      const base = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.3, 0.35, 0.15, 16),
-        new THREE.MeshLambertMaterial({ color: 0x888888 })
+      // Wide circular basin
+      const basin = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.4, 0.4, 0.08, 24),
+        new THREE.MeshLambertMaterial({ color: 0xcccccc })
       );
-      base.position.y = 0.075;
-      base.castShadow = true;
-      group.add(base);
-      const pillar = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.05, 0.05, 0.4, 8),
-        new THREE.MeshLambertMaterial({ color: 0x999999 })
+      basin.position.y = 0.04;
+      basin.castShadow = true;
+      group.add(basin);
+      // Water surface inside
+      const water = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.35, 0.35, 0.01, 24),
+        new THREE.MeshLambertMaterial({ color: 0x4488cc })
       );
-      pillar.position.y = 0.35;
-      pillar.castShadow = true;
-      group.add(pillar);
+      water.position.y = 0.07;
+      group.add(water);
+      // Center column
+      const column = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.04, 0.04, 0.35, 8),
+        new THREE.MeshLambertMaterial({ color: 0xcccccc })
+      );
+      column.position.y = 0.04 + 0.35 / 2;
+      column.castShadow = true;
+      group.add(column);
+      // Small sphere on top
       const top = new THREE.Mesh(
-        new THREE.SphereGeometry(0.08, 8, 8),
-        new THREE.MeshLambertMaterial({ color: 0x6699cc })
+        new THREE.SphereGeometry(0.06, 12, 12),
+        new THREE.MeshLambertMaterial({ color: 0x4488cc })
       );
-      top.position.y = 0.55;
+      top.position.y = 0.04 + 0.35 + 0.06;
       group.add(top);
       obj = group;
     } else {
-      // Playground — colorful shapes
+      // Playground — swing set
       const group = new THREE.Group();
-      const slide = new THREE.Mesh(
-        new THREE.BoxGeometry(0.15, 0.4, 0.5),
+      // Left vertical pole
+      const poleLeft = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.02, 0.02, 0.5, 8),
         new THREE.MeshLambertMaterial({ color: 0xdd4444 })
       );
-      slide.position.set(0, 0.2, 0);
-      slide.rotation.x = 0.3;
-      slide.castShadow = true;
-      group.add(slide);
-      const frame = new THREE.Mesh(
-        new THREE.BoxGeometry(0.4, 0.5, 0.05),
-        new THREE.MeshLambertMaterial({ color: 0x4488dd })
+      poleLeft.position.set(-0.15, 0.25, 0);
+      poleLeft.castShadow = true;
+      group.add(poleLeft);
+      // Right vertical pole
+      const poleRight = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.02, 0.02, 0.5, 8),
+        new THREE.MeshLambertMaterial({ color: 0xdd4444 })
       );
-      frame.position.set(0, 0.25, -0.2);
-      frame.castShadow = true;
-      group.add(frame);
+      poleRight.position.set(0.15, 0.25, 0);
+      poleRight.castShadow = true;
+      group.add(poleRight);
+      // Horizontal bar connecting at top
+      const bar = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.02, 0.02, 0.3, 8),
+        new THREE.MeshLambertMaterial({ color: 0xdd4444 })
+      );
+      bar.position.set(0, 0.5, 0);
+      bar.rotation.z = Math.PI / 2;
+      bar.castShadow = true;
+      group.add(bar);
+      // Seat hanging from center
+      const seat = new THREE.Mesh(
+        new THREE.BoxGeometry(0.08, 0.02, 0.05),
+        new THREE.MeshLambertMaterial({ color: 0xffcc00 })
+      );
+      seat.position.set(0, 0.2, 0);
+      seat.castShadow = true;
+      group.add(seat);
       obj = group;
     }
   }
@@ -450,6 +498,14 @@ street.position.set(0, 0.01, 1.2);
 street.receiveShadow = true;
 scene.add(street);
 
+const sidewalkGeo = new THREE.PlaneGeometry(20, 0.6);
+const sidewalkMat = new THREE.MeshLambertMaterial({ color: 0xaaaaaa });
+const sidewalk = new THREE.Mesh(sidewalkGeo, sidewalkMat);
+sidewalk.rotation.x = -Math.PI / 2;
+sidewalk.position.set(0, 0.01, 0.45);
+sidewalk.receiveShadow = true;
+scene.add(sidewalk);
+
 // ── Building Management ─────────────────────────────────────
 let actualFloorHeight = 1.0;
 const loader = new GLTFLoader();
@@ -603,10 +659,10 @@ const currentLookAt = new THREE.Vector3(0, 0.3, 0);
 
 function updateCamera() {
   const buildingHeight = (state.floors + 1) * actualFloorHeight;
-  const lookAtY = buildingHeight * 0.35;
-  const distance = Math.max(8, buildingHeight * 0.6 + 6);
+  const lookAtY = buildingHeight * 0.45;
+  const distance = Math.max(8, buildingHeight * 0.8 + 6);
 
-  cameraTargetPos.set(distance * 0.15, lookAtY + distance * 0.35, distance);
+  cameraTargetPos.set(distance * 0.15, lookAtY + distance * 0.3, distance);
   cameraTargetLookAt.set(0, lookAtY, 0);
 }
 
@@ -686,6 +742,37 @@ function updateMoneyPops() {
 let popTimer = 0;
 const POP_INTERVAL = CONFIG.moneyPopInterval;
 
+function spawnCafePop(cafeIndex: number) {
+  const cafeVis = HOOD_VISUALS['cafe'];
+  if (cafeIndex >= cafeVis.positions.length) return;
+  const cafePos = cafeVis.positions[cafeIndex];
+
+  const worldPos = new THREE.Vector3(cafePos.x, 0.5, cafePos.z);
+  worldPos.project(camera);
+
+  const hw = window.innerWidth / 2;
+  const hh = window.innerHeight / 2;
+  const sx = worldPos.x * hw + hw;
+  const sy = -(worldPos.y * hh) + hh;
+
+  if (worldPos.z <= 0 || worldPos.z >= 1) return;
+
+  const cafeDef = neighborhoodUpgrades.find(n => n.id === 'cafe');
+  if (!cafeDef || cafeDef.count === 0) return;
+  const cafeIncome = getNeighborhoodIncome();
+  const perCafe = Math.floor(cafeIncome / cafeDef.count);
+
+  const el = document.createElement('div');
+  el.className = 'money-pop cafe-pop';
+  el.textContent = `+$${perCafe}`;
+  el.style.left = `${sx}px`;
+  el.style.top = `${sy}px`;
+  popsContainer.appendChild(el);
+
+  const angle = (-10 - Math.random() * 40) * (Math.PI / 180);
+  activePops.push({ el, startTime: performance.now(), sx, sy, angle });
+}
+
 function tickMoneyPops(delta: number) {
   popTimer += delta;
   if (popTimer >= POP_INTERVAL) {
@@ -694,6 +781,14 @@ function tickMoneyPops(delta: number) {
     for (let i = 0; i < state.occupied && i < state.floors; i++) {
       // Stagger slightly so they don't all appear at once
       setTimeout(() => spawnMoneyPop(i), i * 80);
+    }
+    // Pop from first 3 cafés
+    const cafeDef = neighborhoodUpgrades.find(n => n.id === 'cafe');
+    if (cafeDef && cafeDef.count > 0) {
+      const maxCafePops = Math.min(cafeDef.count, 3);
+      for (let i = 0; i < maxCafePops; i++) {
+        setTimeout(() => spawnCafePop(i), (state.occupied + i) * 80);
+      }
     }
   }
   updateMoneyPops();
