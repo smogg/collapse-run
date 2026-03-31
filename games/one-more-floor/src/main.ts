@@ -464,7 +464,30 @@ function ensureFloorPanels() {
   }
 }
 
-function updateFloorPanels() {
+// Position-only update — runs every frame for smooth movement
+function updateFloorPanelPositions() {
+  for (let i = 0; i < floorPanels.length; i++) {
+    const panel = floorPanels[i];
+    const worldPos = new THREE.Vector3(-0.8, (i + 0.5) * actualFloorHeight, 0);
+    buildingGroup.localToWorld(worldPos);
+    worldPos.project(camera);
+
+    const hw = window.innerWidth / 2;
+    const hh = window.innerHeight / 2;
+    const sx = worldPos.x * hw + hw;
+    const sy = -(worldPos.y * hh) + hh;
+
+    if (worldPos.z > 0 && worldPos.z < 1) {
+      panel.el.style.transform = `translate(-100%, -50%) translate(${sx}px, ${sy}px)`;
+      panel.el.style.opacity = '1';
+    } else {
+      panel.el.style.opacity = '0';
+    }
+  }
+}
+
+// Content update — runs throttled
+function updateFloorPanelContent() {
   ensureFloorPanels();
 
   for (let i = 0; i < floorPanels.length; i++) {
@@ -502,7 +525,6 @@ function updateFloorPanels() {
       const canAfford = state.money >= cost;
       panel.buyBtn.style.display = '';
       panel.buyBtn.disabled = !canAfford;
-      // Only update innerHTML when content changes to avoid destroying click targets
       const key = `${next.id}:${formatMoney(cost)}`;
       if (panel.buyBtn.dataset.key !== key) {
         panel.buyBtn.dataset.key = key;
@@ -517,24 +539,6 @@ function updateFloorPanels() {
       panel.buyBtn.classList.toggle('affordable', canAfford);
     } else {
       panel.buyBtn.style.display = 'none';
-    }
-
-    // Project 3D position to screen — LEFT side of building
-    const worldPos = new THREE.Vector3(-0.8, (i + 0.5) * actualFloorHeight, 0);
-    buildingGroup.localToWorld(worldPos);
-    worldPos.project(camera);
-
-    const hw = window.innerWidth / 2;
-    const hh = window.innerHeight / 2;
-    const sx = worldPos.x * hw + hw;
-    const sy = -(worldPos.y * hh) + hh;
-
-    if (worldPos.z > 0 && worldPos.z < 1) {
-      // Anchor to the right edge (panel extends left from building)
-      panel.el.style.transform = `translate(-100%, -50%) translate(${sx}px, ${sy}px)`;
-      panel.el.style.opacity = '1';
-    } else {
-      panel.el.style.opacity = '0';
     }
   }
 }
@@ -654,12 +658,15 @@ function gameLoop(time: number) {
   // ── Money pops (DOM, throttled with the pops themselves) ──
   tickMoneyPops(delta);
 
-  // ── DOM updates throttled ──
+  // ── Floor panel positions every frame (cheap: just math + CSS transform) ──
+  updateFloorPanelPositions();
+
+  // ── DOM content updates throttled ──
   uiTimer += delta;
   if (uiTimer >= UI_INTERVAL) {
     uiTimer = 0;
     renderUI();
-    updateFloorPanels();
+    updateFloorPanelContent();
   }
 
   // ── Camera animation ──
