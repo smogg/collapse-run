@@ -43,7 +43,7 @@ const CONFIG = {
   // incomeMultiplier: each purchase multiplies TOTAL income by (1 + this)
   // rentBonusPerFloor: flat bonus added to each floor's rent
   neighborhood: [
-    { id: 'sidewalk',    name: 'Sidewalk',       icon: '🚶', rentBonusPerFloor: 0.8,  incomeMultiplier: 0.03, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 150,  costScale: 1.00, maxCount: 1,   unlockFloors: 1 },
+    { id: 'sidewalk',    name: 'Sidewalk',       icon: '🚶', rentBonusPerFloor: 5,    incomeMultiplier: 0.15, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 5000, costScale: 1.00, maxCount: 1,   unlockFloors: 1 },
     { id: 'streetlight', name: 'Streetlight',   icon: '💡', rentBonusPerFloor: 0.5,  incomeMultiplier: 0.02, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 50,   costScale: 1.35, maxCount: 500, unlockFloors: 1 },
     { id: 'tree',        name: 'Tree',          icon: '🌳', rentBonusPerFloor: 0.3,  incomeMultiplier: 0.01, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 25,   costScale: 1.30, maxCount: 500, unlockFloors: 1 },
     { id: 'bench',       name: 'Park Bench',    icon: '🪑', rentBonusPerFloor: 0.2,  incomeMultiplier: 0.015,ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 40,   costScale: 1.32, maxCount: 500, unlockFloors: 3 },
@@ -821,13 +821,21 @@ const cameraTargetPos = new THREE.Vector3(1, 2, 8);
 const cameraTargetLookAt = new THREE.Vector3(0, 0.3, 0);
 const currentLookAt = new THREE.Vector3(0, 0.3, 0);
 
+function isMobile(): boolean {
+  return window.matchMedia('(max-width: 600px)').matches;
+}
+
 function updateCamera() {
   const buildingHeight = (state.floorCount + 1) * actualFloorHeight;
   const lookAtY = buildingHeight * 0.45;
-  const distance = Math.max(8, buildingHeight * 0.8 + 6);
+  const baseDistance = Math.max(8, buildingHeight * 0.8 + 6);
+  // On mobile, push camera 4x further back so building is much smaller
+  const distance = isMobile() ? baseDistance * 4 : baseDistance;
+  // On mobile, look lower so building sits near bottom of screen
+  const mobileYOffset = isMobile() ? -distance * 0.15 : 0;
 
   cameraTargetPos.set(distance * 0.15, lookAtY + distance * 0.3, distance);
-  cameraTargetLookAt.set(0, lookAtY, 0);
+  cameraTargetLookAt.set(0, lookAtY + mobileYOffset, 0);
 }
 
 function animateCamera() {
@@ -1715,6 +1723,7 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  updateCamera();
   markDirty();
 });
 
