@@ -78,12 +78,26 @@
 
     #stats .info-row .label { color: #aaa; }
 
+    #vacancy-section {
+      margin-top: 4px;
+    }
+
+    #ad-btn-container {
+      margin-top: 6px;
+    }
+
+    #ad-btn-container .ad-btn {
+      width: 100%;
+      border-radius: 8px;
+      padding: 6px 8px !important;
+    }
+
     #vacancy-bar {
       width: 100%;
       height: 6px;
       background: #444;
       border-radius: 3px;
-      margin-top: 8px;
+      margin-top: 4px;
       overflow: hidden;
     }
 
@@ -487,15 +501,22 @@
 
     /* ── Mobile ── */
     @media (max-width: 600px) {
+      #stats {
+        position: fixed;
+        left: 6px;
+        top: 6px;
+        right: auto;
+        width: 150px;
+        padding: 8px 10px;
+        z-index: 25;
+        pointer-events: auto;
+      }
       #panel {
         right: 6px;
         top: 6px;
         bottom: 6px;
         width: 160px;
         gap: 5px;
-      }
-      #stats {
-        padding: 8px 10px;
       }
       #stats .money { font-size: 18px; }
       #stats .income { font-size: 11px; }
@@ -553,13 +574,16 @@
           <span class="label">Fill rate</span>
           <span id="fill-rate-display">0.15/s</span>
         </div>
-        <div class="info-row" style="margin-top:8px">
-          <span class="label">Tenants</span>
-        </div>
-        <div id="vacancy-bar"><div id="vacancy-fill" style="width:10%"></div></div>
-        <div id="vacancy-label">
-          <span id="occupancy-display">1/10</span>
-          <span id="occupancy-pct">10%</span>
+        <div id="vacancy-section">
+          <div class="info-row" style="margin-top:8px">
+            <span class="label">Tenants</span>
+          </div>
+          <div id="vacancy-bar"><div id="vacancy-fill" style="width:10%"></div></div>
+          <div id="vacancy-label">
+            <span id="occupancy-display">1/10</span>
+            <span id="occupancy-pct">10%</span>
+          </div>
+          <div id="ad-btn-container"></div>
         </div>
       </div>
       <div id="shop"></div>

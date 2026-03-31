@@ -826,16 +826,20 @@ function isMobile(): boolean {
 }
 
 function updateCamera() {
-  const buildingHeight = (state.floorCount + 1) * actualFloorHeight;
+  const scale = isMobile() ? 0.25 : 1;
+  buildingGroup.scale.setScalar(scale);
+  const buildingHeight = (state.floorCount + 1) * actualFloorHeight * scale;
   const lookAtY = buildingHeight * 0.45;
-  const baseDistance = Math.max(8, buildingHeight * 0.8 + 6);
-  // On mobile, push camera 4x further back so building is much smaller
-  const distance = isMobile() ? baseDistance * 4 : baseDistance;
-  // On mobile, look lower so building sits near bottom of screen
-  const mobileYOffset = isMobile() ? -distance * 0.15 : 0;
+  const distance = Math.max(8, buildingHeight * 0.8 + 6);
 
-  cameraTargetPos.set(distance * 0.15, lookAtY + distance * 0.3, distance);
-  cameraTargetLookAt.set(0, lookAtY + mobileYOffset, 0);
+  if (isMobile()) {
+    // Camera lower + look higher so building sits at bottom of screen
+    cameraTargetPos.set(distance * 0.15, lookAtY + distance * 0.1, distance);
+    cameraTargetLookAt.set(0, lookAtY + distance * 0.25, 0);
+  } else {
+    cameraTargetPos.set(distance * 0.15, lookAtY + distance * 0.3, distance);
+    cameraTargetLookAt.set(0, lookAtY, 0);
+  }
 }
 
 function animateCamera() {
@@ -1202,7 +1206,7 @@ adBtn.addEventListener('click', () => {
     renderUI();
   }
 });
-shopEl.appendChild(adBtn);
+document.getElementById('ad-btn-container')!.appendChild(adBtn);
 
 // ── Bulk Upgrade Buttons (right panel, post-cap) ─────────────
 const bulkEl = document.getElementById('bulk-upgrades')!;
@@ -1459,14 +1463,15 @@ function renderUI() {
     }
   }
 
-  // Hire Agents button — hidden when tenants are full
+  // Vacancy section + Hire Agents — hidden when tenants are full
   {
     const totalTenants = getTotalTenants();
     const totalSlots = getTotalSlots();
+    const vacancySection = document.getElementById('vacancy-section')!;
     if (totalTenants >= totalSlots) {
-      adBtn.style.display = 'none';
+      vacancySection.style.display = 'none';
     } else {
-      adBtn.style.display = '';
+      vacancySection.style.display = '';
       const adCost = getAdCost();
       const canAffordAd = state.money >= adCost;
       adBtn.disabled = !canAffordAd;
