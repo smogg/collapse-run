@@ -330,8 +330,8 @@ function getAmenityCost(a: AmenityDef): number {
   return Math.floor(a.baseCost * Math.pow(a.costScale, a.totalInstalled));
 }
 
-const floorBaseCost = 10;
-const floorCostScale = 1.35;
+const floorBaseCost = 25;
+const floorCostScale = 1.55;
 let floorsPurchased = 0;
 
 function getFloorCost(): number {
@@ -941,7 +941,7 @@ function renderUI() {
   const floorCost = getFloorCost();
   const canBuyFloor = state.money >= floorCost && !atCap;
   floorBtn.disabled = !canBuyFloor;
-  const floorKey = `${floorCost}:${state.floors}:${atCap}`;
+  const floorKey = `${floorCost}:${state.floors}:${atCap}:${getNeighborhoodRentBonus()}`;
   if (floorBtn.dataset.key !== floorKey) {
     floorBtn.dataset.key = floorKey;
     if (atCap) {
@@ -951,10 +951,12 @@ function renderUI() {
         <span class="desc">Upgrade all floors first!</span>
       `;
     } else {
+      // Show how much income a new floor would add (base rent + neighborhood bonus)
+      const newFloorRent = BASE_RENT + getNeighborhoodRentBonus();
       floorBtn.innerHTML = `
         + New Floor
         <span class="cost">${formatMoney(floorCost)}</span>
-        <span class="desc">Add floor #${state.floors + 1}</span>
+        <span class="desc">Floor #${state.floors + 1} · <span style="color:#7efa7e">+$${Math.floor(newFloorRent)}/s</span></span>
       `;
     }
   }
