@@ -11,7 +11,7 @@ const CONFIG = {
 
   // Floors
   floorBaseCost: 10000,     // first extra floor costs this
-  floorCostScale: 3.6,      // each floor costs this × more (10k, 36k, 130k, 467k...)
+  floorCostScale: 7.2,      // each floor costs this × more (10k, 72k, 518k, 3.7M...)
   perFloorCap: 10,          // per-floor UI phase ends here
 
   // Tenants
@@ -43,8 +43,8 @@ const CONFIG = {
   // incomeMultiplier: each purchase multiplies TOTAL income by (1 + this)
   // rentBonusPerFloor: flat bonus added to each floor's rent
   neighborhood: [
-    { id: 'sidewalk',    name: 'Sidewalk',       icon: '🚶', rentBonusPerFloor: 0.8,  incomeMultiplier: 0.03, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 150,  costScale: 1.00, maxCount: 1,   unlockFloors: 2 },
-    { id: 'streetlight', name: 'Streetlight',   icon: '💡', rentBonusPerFloor: 0.5,  incomeMultiplier: 0.02, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 50,   costScale: 1.35, maxCount: 500, unlockFloors: 2 },
+    { id: 'sidewalk',    name: 'Sidewalk',       icon: '🚶', rentBonusPerFloor: 0.8,  incomeMultiplier: 0.03, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 150,  costScale: 1.00, maxCount: 1,   unlockFloors: 1 },
+    { id: 'streetlight', name: 'Streetlight',   icon: '💡', rentBonusPerFloor: 0.5,  incomeMultiplier: 0.02, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 50,   costScale: 1.35, maxCount: 500, unlockFloors: 1 },
     { id: 'tree',        name: 'Tree',          icon: '🌳', rentBonusPerFloor: 0.3,  incomeMultiplier: 0.01, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 25,   costScale: 1.30, maxCount: 500, unlockFloors: 1 },
     { id: 'bench',       name: 'Park Bench',    icon: '🪑', rentBonusPerFloor: 0.2,  incomeMultiplier: 0.015,ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 40,   costScale: 1.32, maxCount: 500, unlockFloors: 3 },
     { id: 'parking',     name: 'Parking Space', icon: '🅿️', rentBonusPerFloor: 0.8,  incomeMultiplier: 0.03, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 200,  costScale: 1.30, maxCount: 500, unlockFloors: 5 },
@@ -494,9 +494,13 @@ function getAverageRentPerTenant(): number {
 // ── Upgrade Costs ────────────────────────────────────────────
 function getAmenityCostPerUnit(a: AmenityDef, floorIndex: number): number {
   const floor = state.floorStates[floorIndex];
-  const floorMultiplier = Math.pow(CONFIG.floorCostScale, floorIndex);
-  const studioMultiplier = floor ? Math.pow(5, floor.studioLevel) : 1; // 5x per studio level
-  return Math.floor(a.baseCost * floorMultiplier * studioMultiplier);
+  // Cost scales with floor cost: on floor N, amenity costs (1 + N*0.5) × floorCost fraction
+  const floorCost = Math.floor(CONFIG.floorBaseCost * Math.pow(CONFIG.floorCostScale, Math.max(0, floorIndex)));
+  const floorScaleFactor = (1 + floorIndex * 0.5); // 1x on floor 0, 1.5x on floor 1, 2x on floor 2...
+  const studioMultiplier = floor ? Math.pow(5, floor.studioLevel) : 1;
+  // Base cost as a fraction of floor cost, scaled by the amenity's baseCost ratio
+  const amenityFraction = a.baseCost / CONFIG.floorBaseCost; // how much of floor cost this amenity represents
+  return Math.floor(floorCost * amenityFraction * floorScaleFactor * studioMultiplier);
 }
 
 // Total cost to install amenity on all remaining apartments on a floor
@@ -509,8 +513,9 @@ function getAmenityFullCost(a: AmenityDef, floorIndex: number): number {
 }
 
 function getStudioCost(floorIndex: number, studioLevel: number): number {
-  const floorMultiplier = Math.pow(CONFIG.floorCostScale, floorIndex);
-  return Math.floor(CONFIG.studioBaseCost * floorMultiplier * Math.pow(CONFIG.studioCostScale, studioLevel));
+  const floorCost = Math.floor(CONFIG.floorBaseCost * Math.pow(CONFIG.floorCostScale, Math.max(0, floorIndex)));
+  const floorScaleFactor = (1 + floorIndex * 0.5);
+  return Math.floor(floorCost * 3 * floorScaleFactor * Math.pow(CONFIG.studioCostScale, studioLevel));
 }
 
 let peakMoney = 0; // track highest money ever reached
@@ -1082,17 +1087,7 @@ function updateFloorPanelContent() {
       if (complete) {
         panel.iconsEl.innerHTML = '<span class="floor-complete">\u2605</span>';
       } else {
-        let icons = '';
-        for (const a of amenities) {
-          const installs = floor.amenityInstalls.get(a.id) || 0;
-          if (installs >= floor.maxTenants) {
-            icons += `<span class="floor-installed-icon">${a.icon}</span>`;
-          }
-        }
-        if (floor.studioLevel > 0) {
-          icons += `<span class="floor-installed-icon">🏠${floor.studioLevel}</span>`;
-        }
-        panel.iconsEl.innerHTML = icons;
+        panel.iconsEl.innerHTML = '';
       }
     }
 
