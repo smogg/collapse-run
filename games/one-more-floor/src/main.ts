@@ -6,7 +6,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 // ══════════════════════════════════════════════════════════════
 const CONFIG = {
   // Economy
-  baseRent: 1,              // rent per floor with no upgrades
+  baseRent: 2,              // rent per floor with no upgrades
   incomeTickRate: 0.1,      // minimum money increment
 
   // Floors
@@ -20,23 +20,33 @@ const CONFIG = {
 
   // Amenities (per-floor upgrades)
   amenities: [
-    { id: 'hotwater', name: 'Hot Water', icon: '🚿', rentBonus: 1,  baseCost: 8,   costScale: 1.06, unlockFloors: 1 },
-    { id: 'heating',  name: 'Heating',   icon: '🔥', rentBonus: 2,  baseCost: 20,  costScale: 1.08, unlockFloors: 1 },
-    { id: 'ac',       name: 'AC',        icon: '❄️', rentBonus: 3,  baseCost: 50,  costScale: 1.10, unlockFloors: 3 },
-    { id: 'balcony',  name: 'Balcony',   icon: '🌿', rentBonus: 5,  baseCost: 120, costScale: 1.12, unlockFloors: 5 },
-    { id: 'laundry',  name: 'Laundry',   icon: '👕', rentBonus: 4,  baseCost: 200, costScale: 1.14, unlockFloors: 8 },
-    { id: 'gym',      name: 'Gym',       icon: '💪', rentBonus: 7,  baseCost: 500, costScale: 1.16, unlockFloors: 12 },
+    { id: 'hotwater', name: 'Hot Water', icon: '🚿', rentBonus: 2,  baseCost: 8,   costScale: 1.08, unlockFloors: 1 },
+    { id: 'heating',  name: 'Heating',   icon: '🔥', rentBonus: 3,  baseCost: 25,  costScale: 1.10, unlockFloors: 1 },
+    { id: 'ac',       name: 'AC',        icon: '❄️', rentBonus: 5,  baseCost: 60,  costScale: 1.12, unlockFloors: 3 },
+    { id: 'balcony',  name: 'Balcony',   icon: '🌿', rentBonus: 8,  baseCost: 150, costScale: 1.14, unlockFloors: 5 },
+    { id: 'laundry',  name: 'Laundry',   icon: '👕', rentBonus: 6,  baseCost: 250, costScale: 1.16, unlockFloors: 8 },
+    { id: 'gym',      name: 'Gym',       icon: '💪', rentBonus: 12, baseCost: 600, costScale: 1.18, unlockFloors: 12 },
   ],
 
   // Neighborhood upgrades
+  // incomeMultiplier: each purchase multiplies TOTAL income by (1 + this)
+  // rentBonusPerFloor: flat bonus added to each floor's rent
   neighborhood: [
-    { id: 'streetlight', name: 'Streetlight',   icon: '💡', rentBonusPerFloor: 0.3,  ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 40,  costScale: 1.35, maxCount: 50,  unlockFloors: 2 },
-    { id: 'tree',        name: 'Tree',          icon: '🌳', rentBonusPerFloor: 0.2,  ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 20,  costScale: 1.30, maxCount: 50,  unlockFloors: 1 },
-    { id: 'bench',       name: 'Park Bench',    icon: '🪑', rentBonusPerFloor: 0.15, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 35,  costScale: 1.32, maxCount: 30,  unlockFloors: 3 },
-    { id: 'parking',     name: 'Parking Space', icon: '🅿️', rentBonusPerFloor: 0.5,  ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 150, costScale: 1.30, maxCount: 100, unlockFloors: 5 },
-    { id: 'cafe',        name: 'Café',          icon: '☕', rentBonusPerFloor: 0.5,  ownIncome: 5,   ownIncomeFloorScale: 0.5, baseCost: 800, costScale: 1.40, maxCount: 20,  unlockFloors: 8 },
-    { id: 'fountain',    name: 'Fountain',      icon: '⛲', rentBonusPerFloor: 1.0,  ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 500, costScale: 1.38, maxCount: 20,  unlockFloors: 6 },
-    { id: 'playground',  name: 'Playground',    icon: '🎠', rentBonusPerFloor: 0.7,  ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 350, costScale: 1.35, maxCount: 20,  unlockFloors: 4 },
+    { id: 'streetlight', name: 'Streetlight',   icon: '💡', rentBonusPerFloor: 0.5,  incomeMultiplier: 0.02, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 50,   costScale: 1.35, maxCount: 50,  unlockFloors: 2 },
+    { id: 'tree',        name: 'Tree',          icon: '🌳', rentBonusPerFloor: 0.3,  incomeMultiplier: 0.01, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 25,   costScale: 1.30, maxCount: 50,  unlockFloors: 1 },
+    { id: 'bench',       name: 'Park Bench',    icon: '🪑', rentBonusPerFloor: 0.2,  incomeMultiplier: 0.015,ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 40,   costScale: 1.32, maxCount: 30,  unlockFloors: 3 },
+    { id: 'parking',     name: 'Parking Space', icon: '🅿️', rentBonusPerFloor: 0.8,  incomeMultiplier: 0.03, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 200,  costScale: 1.30, maxCount: 100, unlockFloors: 5 },
+    { id: 'cafe',        name: 'Café',          icon: '☕', rentBonusPerFloor: 1.0,  incomeMultiplier: 0.05, ownIncome: 10,  ownIncomeFloorScale: 1.0, baseCost: 1000, costScale: 1.45, maxCount: 20,  unlockFloors: 8 },
+    { id: 'fountain',    name: 'Fountain',      icon: '⛲', rentBonusPerFloor: 1.5,  incomeMultiplier: 0.04, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 600,  costScale: 1.38, maxCount: 20,  unlockFloors: 6 },
+    { id: 'playground',  name: 'Playground',    icon: '🎠', rentBonusPerFloor: 1.0,  incomeMultiplier: 0.03, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 400,  costScale: 1.35, maxCount: 20,  unlockFloors: 4 },
+  ],
+
+  // Café sub-upgrades (each one multiplies café income)
+  cafeUpgrades: [
+    { id: 'menu',      name: 'Better Menu',      icon: '📋', incomeBoost: 0.5, baseCost: 300,  costScale: 1.50, maxLevel: 20 },
+    { id: 'seating',   name: 'More Seating',     icon: '💺', incomeBoost: 0.3, baseCost: 400,  costScale: 1.45, maxLevel: 20 },
+    { id: 'delivery',  name: 'Delivery Service', icon: '🛵', incomeBoost: 1.0, baseCost: 1500, costScale: 1.60, maxLevel: 10 },
+    { id: 'marketing', name: 'Marketing',        icon: '📢', incomeBoost: 0.8, baseCost: 800,  costScale: 1.55, maxLevel: 15 },
   ],
 
   // Visuals
@@ -64,18 +74,26 @@ interface NeighborhoodDef {
   name: string;
   icon: string;
   description: string;
-  model: string | null; // null = procedural geometry
-  rentBonusPerFloor: number; // added to every floor's rent per purchase
-  ownIncome: number; // base income this generates (e.g. café)
-  ownIncomeFloorScale: number; // multiplied by floors (more tenants = more customers)
+  model: string | null;
+  rentBonusPerFloor: number;
+  incomeMultiplier: number; // each purchase multiplies total income by (1 + this)
+  ownIncome: number;
+  ownIncomeFloorScale: number;
   baseCost: number;
   costScale: number;
-  maxCount: number; // max times you can buy this
+  maxCount: number;
   count: number;
   unlockFloors: number;
   positions: { x: number; y: number; z: number; ry: number }[];
   scaleOverride?: number;
 }
+
+interface CafeUpgradeState {
+  id: string;
+  level: number;
+}
+
+const cafeUpgradeState: CafeUpgradeState[] = CONFIG.cafeUpgrades.map(u => ({ id: u.id, level: 0 }));
 
 interface GameState {
   money: number;
@@ -153,6 +171,36 @@ function getNeighborhoodRentBonus(): number {
   return bonus;
 }
 
+// Global income multiplier from neighborhood — compounds!
+function getGlobalMultiplier(): number {
+  let mult = 1;
+  for (const n of neighborhoodUpgrades) {
+    if (n.incomeMultiplier > 0 && n.count > 0) {
+      mult *= Math.pow(1 + n.incomeMultiplier, n.count);
+    }
+  }
+  return mult;
+}
+
+// Café sub-upgrade multiplier
+function getCafeUpgradeMultiplier(): number {
+  let mult = 1;
+  for (let i = 0; i < CONFIG.cafeUpgrades.length; i++) {
+    const cfg = CONFIG.cafeUpgrades[i];
+    const st = cafeUpgradeState[i];
+    if (st.level > 0) {
+      mult *= (1 + cfg.incomeBoost * st.level);
+    }
+  }
+  return mult;
+}
+
+function getCafeUpgradeCost(index: number): number {
+  const cfg = CONFIG.cafeUpgrades[index];
+  const st = cafeUpgradeState[index];
+  return Math.floor(cfg.baseCost * Math.pow(cfg.costScale, st.level));
+}
+
 function getNeighborhoodIncome(): number {
   let income = 0;
   for (const n of neighborhoodUpgrades) {
@@ -160,6 +208,8 @@ function getNeighborhoodIncome(): number {
       income += n.ownIncome * n.count * (1 + state.floors * n.ownIncomeFloorScale);
     }
   }
+  // Apply café sub-upgrade multiplier
+  income *= getCafeUpgradeMultiplier();
   return income;
 }
 
@@ -267,7 +317,9 @@ function getTotalRentPerSecond(): number {
   for (let i = 0; i < state.occupied; i++) {
     total += getFloorRent(i);
   }
-  // Add neighborhood businesses income
+  // Apply global multiplier from neighborhood (compounds!)
+  total *= getGlobalMultiplier();
+  // Add neighborhood businesses income (already has café multiplier)
   total += getNeighborhoodIncome();
   return total;
 }
@@ -877,6 +929,75 @@ for (const n of neighborhoodUpgrades) {
   hoodButtons.set(n.id, btn);
 }
 
+// ── Café Upgrade Buttons ─────────────────────────────────────
+const cafeSectionEl = document.getElementById('cafe-section')!;
+const cafeUpgradesEl = document.getElementById('cafe-upgrades')!;
+const cafeButtons: HTMLButtonElement[] = [];
+
+for (let i = 0; i < CONFIG.cafeUpgrades.length; i++) {
+  const cfg = CONFIG.cafeUpgrades[i];
+  const btn = document.createElement('button');
+  btn.className = 'hood-btn';
+  btn.addEventListener('click', () => {
+    const st = cafeUpgradeState[i];
+    if (st.level >= cfg.maxLevel) return;
+    const cost = getCafeUpgradeCost(i);
+    if (state.money < cost) return;
+    state.money -= cost;
+    st.level++;
+    renderUI();
+  });
+  cafeUpgradesEl.appendChild(btn);
+  cafeButtons.push(btn);
+}
+
+function renderCafeUI() {
+  // Only show if at least one café exists
+  const cafeCount = neighborhoodUpgrades.find(n => n.id === 'cafe')?.count ?? 0;
+  cafeSectionEl.style.display = cafeCount > 0 ? '' : 'none';
+  if (cafeCount === 0) return;
+
+  for (let i = 0; i < CONFIG.cafeUpgrades.length; i++) {
+    const cfg = CONFIG.cafeUpgrades[i];
+    const st = cafeUpgradeState[i];
+    const btn = cafeButtons[i];
+    const maxed = st.level >= cfg.maxLevel;
+    if (maxed) {
+      btn.disabled = true;
+      btn.className = 'hood-btn maxed';
+      const key = `${cfg.id}:maxed`;
+      if (btn.dataset.key !== key) {
+        btn.dataset.key = key;
+        btn.innerHTML = `
+          <span class="hood-icon">${cfg.icon}</span>
+          <span class="hood-info">
+            <span class="hood-name">${cfg.name}</span>
+            <span class="hood-desc">Maxed out</span>
+          </span>
+          <span class="hood-count">${st.level}/${cfg.maxLevel}</span>
+        `;
+      }
+    } else {
+      const cost = getCafeUpgradeCost(i);
+      const canAfford = state.money >= cost;
+      btn.disabled = !canAfford;
+      btn.className = 'hood-btn';
+      const key = `${cfg.id}:${st.level}:${formatMoney(cost)}`;
+      if (btn.dataset.key !== key) {
+        btn.dataset.key = key;
+        btn.innerHTML = `
+          <span class="hood-icon">${cfg.icon}</span>
+          <span class="hood-info">
+            <span class="hood-name">${cfg.name}</span>
+            <span class="hood-detail"><span class="cost-val">${formatMoney(cost)}</span> · <span class="rent-val">+${Math.round(cfg.incomeBoost * 100)}% café income</span></span>
+          </span>
+          ${st.level > 0 ? `<span class="hood-count">${st.level}/${cfg.maxLevel}</span>` : ''}
+        `;
+      }
+    }
+  }
+}
+
 function renderNeighborhoodUI() {
   for (const n of neighborhoodUpgrades) {
     const btn = hoodButtons.get(n.id)!;
@@ -907,9 +1028,13 @@ function renderNeighborhoodUI() {
       btn.disabled = !canAfford;
       btn.className = 'hood-btn';
       let bonusText = '';
-      if (n.rentBonusPerFloor > 0) bonusText += `<span class="rent-val">+$${n.rentBonusPerFloor}/floor</span>`;
+      if (n.incomeMultiplier > 0) bonusText += `<span class="rent-val">×${((1 + n.incomeMultiplier) * 100 - 100).toFixed(0)}% income</span>`;
+      if (n.rentBonusPerFloor > 0) {
+        if (bonusText) bonusText += ' · ';
+        bonusText += `<span class="rent-val">+$${n.rentBonusPerFloor}/floor</span>`;
+      }
       if (n.ownIncome > 0) {
-        const incomePreview = n.ownIncome * (1 + state.floors * n.ownIncomeFloorScale);
+        const incomePreview = n.ownIncome * (1 + state.floors * n.ownIncomeFloorScale) * getCafeUpgradeMultiplier();
         if (bonusText) bonusText += ' · ';
         bonusText += `<span class="rent-val">earns $${Math.floor(incomePreview)}/s</span>`;
       }
@@ -934,7 +1059,8 @@ function renderUI() {
   const avgRent = getAverageRent();
 
   moneyDisplay.textContent = formatMoney(state.money);
-  incomeDisplay.textContent = formatMoney(income) + '/s';
+  const mult = getGlobalMultiplier();
+  incomeDisplay.textContent = formatMoney(income) + '/s' + (mult > 1.01 ? ` (×${mult.toFixed(2)})` : '');
   floorDisplay.textContent = String(state.floors);
   rentDisplay.textContent = formatMoney(avgRent) + ' avg';
 
@@ -1025,6 +1151,7 @@ function renderUI() {
 
   // Neighborhood
   renderNeighborhoodUI();
+  renderCafeUI();
 }
 
 // ── Game Loop ───────────────────────────────────────────────
