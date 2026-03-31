@@ -64,7 +64,7 @@ const neighborhoodUpgrades: NeighborhoodDef[] = [
     description: 'Lights up the street',
     model: 'models/light-curved.glb',
     rentBonusPerFloor: 0.3, ownIncome: 0, ownIncomeFloorScale: 0,
-    baseCost: 30, costScale: 1.15, maxCount: 8, count: 0, unlockFloors: 2,
+    baseCost: 40, costScale: 1.35, maxCount: 50, count: 0, unlockFloors: 2,
     positions: [
       { x: -1.5, y: 0, z: 1.8, ry: 0 }, { x: 1.5, y: 0, z: 1.8, ry: Math.PI },
       { x: -3, y: 0, z: 1.8, ry: 0 }, { x: 3, y: 0, z: 1.8, ry: Math.PI },
@@ -77,7 +77,7 @@ const neighborhoodUpgrades: NeighborhoodDef[] = [
     description: 'Green and pleasant',
     model: 'models/tree-large.glb',
     rentBonusPerFloor: 0.2, ownIncome: 0, ownIncomeFloorScale: 0,
-    baseCost: 15, costScale: 1.1, maxCount: 12, count: 0, unlockFloors: 1,
+    baseCost: 20, costScale: 1.3, maxCount: 50, count: 0, unlockFloors: 1,
     positions: [
       { x: -1.2, y: 0, z: -0.3, ry: 0 }, { x: 1.2, y: 0, z: -0.3, ry: 0.5 },
       { x: -2, y: 0, z: 0.3, ry: 1 }, { x: 2, y: 0, z: 0.3, ry: 1.5 },
@@ -92,7 +92,7 @@ const neighborhoodUpgrades: NeighborhoodDef[] = [
     description: 'A place to sit',
     model: 'models/planter.glb', // using planter as bench stand-in
     rentBonusPerFloor: 0.15, ownIncome: 0, ownIncomeFloorScale: 0,
-    baseCost: 20, costScale: 1.12, maxCount: 6, count: 0, unlockFloors: 3,
+    baseCost: 35, costScale: 1.32, maxCount: 30, count: 0, unlockFloors: 3,
     scaleOverride: 0.8,
     positions: [
       { x: -1.5, y: 0, z: -0.8, ry: 0.3 }, { x: 1.5, y: 0, z: -0.8, ry: -0.3 },
@@ -105,7 +105,7 @@ const neighborhoodUpgrades: NeighborhoodDef[] = [
     description: 'Underground parking',
     model: null, // no visual, just occupancy bonus
     rentBonusPerFloor: 0.5, ownIncome: 0, ownIncomeFloorScale: 0,
-    baseCost: 100, costScale: 1.18, maxCount: 20, count: 0, unlockFloors: 5,
+    baseCost: 150, costScale: 1.3, maxCount: 100, count: 0, unlockFloors: 5,
     positions: [],
   },
   {
@@ -113,7 +113,7 @@ const neighborhoodUpgrades: NeighborhoodDef[] = [
     description: 'Earns income from tenants',
     model: 'models/building-type-h.glb',
     rentBonusPerFloor: 0.5, ownIncome: 5, ownIncomeFloorScale: 0.5,
-    baseCost: 500, costScale: 1.25, maxCount: 3, count: 0, unlockFloors: 8,
+    baseCost: 800, costScale: 1.4, maxCount: 20, count: 0, unlockFloors: 8,
     scaleOverride: 0.5,
     positions: [
       { x: 2.5, y: 0, z: 0.5, ry: -0.3 },
@@ -126,7 +126,7 @@ const neighborhoodUpgrades: NeighborhoodDef[] = [
     description: 'Beautiful centerpiece',
     model: null, // procedural
     rentBonusPerFloor: 1, ownIncome: 0, ownIncomeFloorScale: 0,
-    baseCost: 300, costScale: 1.3, maxCount: 3, count: 0, unlockFloors: 6,
+    baseCost: 500, costScale: 1.38, maxCount: 20, count: 0, unlockFloors: 6,
     positions: [
       { x: 0, y: 0, z: -1.8, ry: 0 },
       { x: -2, y: 0, z: -2, ry: 0 },
@@ -138,7 +138,7 @@ const neighborhoodUpgrades: NeighborhoodDef[] = [
     description: 'Families love it',
     model: null, // procedural
     rentBonusPerFloor: 0.7, ownIncome: 0, ownIncomeFloorScale: 0,
-    baseCost: 200, costScale: 1.2, maxCount: 3, count: 0, unlockFloors: 4,
+    baseCost: 350, costScale: 1.35, maxCount: 20, count: 0, unlockFloors: 4,
     positions: [
       { x: -2, y: 0, z: -1, ry: 0 },
       { x: 2.5, y: 0, z: -1.5, ry: 0 },
@@ -171,10 +171,25 @@ function getNeighborhoodCost(n: NeighborhoodDef): number {
   return Math.floor(n.baseCost * Math.pow(n.costScale, n.count));
 }
 
-async function spawnNeighborhoodModel(n: NeighborhoodDef) {
+function getSpawnPosition(n: NeighborhoodDef): { x: number; y: number; z: number; ry: number } {
   const posIndex = n.count - 1;
-  if (posIndex < 0 || posIndex >= n.positions.length) return;
-  const pos = n.positions[posIndex];
+  if (posIndex < n.positions.length) {
+    return n.positions[posIndex];
+  }
+  // Generate positions procedurally beyond predefined ones
+  const angle = (posIndex * 2.4) + n.id.length; // golden angle-ish spread
+  const radius = 2 + (posIndex - n.positions.length) * 0.3;
+  const x = Math.cos(angle) * radius;
+  const z = Math.sin(angle) * radius - 0.5;
+  // Keep off the street (z > 0.5 is street area)
+  const safeZ = z > 0.5 ? -(Math.abs(z)) : z;
+  return { x, y: 0, z: safeZ, ry: angle };
+}
+
+async function spawnNeighborhoodModel(n: NeighborhoodDef) {
+  if (n.count <= 0) return;
+  if (!n.model && !['fountain', 'playground'].includes(n.id)) return;
+  const pos = getSpawnPosition(n);
 
   let obj: THREE.Object3D;
   if (n.model) {
