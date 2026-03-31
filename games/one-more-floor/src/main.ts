@@ -21,6 +21,7 @@ interface GameState {
 }
 
 const BASE_RENT = 1;
+const PER_FLOOR_CAP = 10; // per-floor UI phase ends here
 
 const state: GameState = {
   money: 0,
@@ -85,6 +86,42 @@ function getTargetOccupancy(): number {
 
   const occupancyRatio = Math.min(1, coverage / 0.4);
   return Math.max(1, Math.round(state.floors * occupancyRatio));
+}
+
+// ── Phase Detection ─────────────────────────────────────────
+function allFloorsFullyUpgraded(): boolean {
+  const unlocked = amenities.filter(a => state.floors >= a.unlockFloors);
+  for (let i = 0; i < state.floors; i++) {
+    const installed = state.floorAmenities[i];
+    if (!installed || !unlocked.every(a => installed.has(a.id))) return false;
+  }
+  return true;
+}
+
+function isInBulkPhase(): boolean {
+  return state.floors >= PER_FLOOR_CAP && allFloorsFullyUpgraded();
+}
+
+// How many floors are missing a given amenity
+function floorsMissingAmenity(a: AmenityDef): number {
+  let count = 0;
+  for (let i = 0; i < state.floors; i++) {
+    const installed = state.floorAmenities[i];
+    if (!installed || !installed.has(a.id)) count++;
+  }
+  return count;
+}
+
+// Cost to install an amenity on all missing floors
+function getBulkAmenityCost(a: AmenityDef): number {
+  const missing = floorsMissingAmenity(a);
+  let total = 0;
+  let tempInstalled = a.totalInstalled;
+  for (let i = 0; i < missing; i++) {
+    total += Math.floor(a.baseCost * Math.pow(a.costScale, tempInstalled));
+    tempInstalled++;
+  }
+  return total;
 }
 
 // ── Upgrade Cost ────────────────────────────────────────────
@@ -563,6 +600,8 @@ function formatMoney(n: number): string {
 const floorBtn = document.createElement('button');
 floorBtn.className = 'shop-btn floor-btn';
 floorBtn.addEventListener('click', () => {
+  // Block adding floors beyond cap if not all maxed
+  if (state.floors >= PER_FLOOR_CAP && !allFloorsFullyUpgraded()) return;
   const cost = getFloorCost();
   if (state.money >= cost) {
     state.money -= cost;
@@ -575,6 +614,33 @@ floorBtn.addEventListener('click', () => {
   }
 });
 shopEl.appendChild(floorBtn);
+
+// ── Bulk Upgrade Buttons (right panel, post-cap) ─────────────
+const bulkEl = document.getElementById('bulk-upgrades')!;
+const bulkButtons: Map<string, HTMLButtonElement> = new Map();
+
+for (const a of amenities) {
+  const btn = document.createElement('button');
+  btn.className = 'bulk-btn';
+  btn.addEventListener('click', () => {
+    const missing = floorsMissingAmenity(a);
+    if (missing === 0) return;
+    const cost = getBulkAmenityCost(a);
+    if (state.money < cost) return;
+    state.money -= cost;
+    // Install on all missing floors
+    for (let i = 0; i < state.floors; i++) {
+      const installed = state.floorAmenities[i];
+      if (installed && !installed.has(a.id)) {
+        installed.add(a.id);
+        a.totalInstalled++;
+      }
+    }
+    renderUI();
+  });
+  bulkEl.appendChild(btn);
+  bulkButtons.set(a.id, btn);
+}
 
 function renderUI() {
   const income = getTotalRentPerSecond();
@@ -594,16 +660,78 @@ function renderUI() {
   else if (pct >= 50) vacancyFill.style.background = '#fadb7e';
   else vacancyFill.style.background = '#fa7e7e';
 
+  // ── Phase logic ──
+  const bulk = isInBulkPhase();
+  const atCap = state.floors >= PER_FLOOR_CAP && !allFloorsFullyUpgraded();
+
+  // Floor button
   const floorCost = getFloorCost();
-  floorBtn.disabled = state.money < floorCost;
-  const floorKey = `${floorCost}:${state.floors}`;
+  const canBuyFloor = state.money >= floorCost && !atCap;
+  floorBtn.disabled = !canBuyFloor;
+  const floorKey = `${floorCost}:${state.floors}:${atCap}`;
   if (floorBtn.dataset.key !== floorKey) {
     floorBtn.dataset.key = floorKey;
-    floorBtn.innerHTML = `
-      + New Floor
-      <span class="cost">${formatMoney(floorCost)}</span>
-      <span class="desc">Add floor #${state.floors + 1}</span>
-    `;
+    if (atCap) {
+      floorBtn.innerHTML = `
+        + New Floor
+        <span class="cost">${formatMoney(floorCost)}</span>
+        <span class="desc">Upgrade all floors first!</span>
+      `;
+    } else {
+      floorBtn.innerHTML = `
+        + New Floor
+        <span class="cost">${formatMoney(floorCost)}</span>
+        <span class="desc">Add floor #${state.floors + 1}</span>
+      `;
+    }
+  }
+
+  // Show/hide per-floor panels vs bulk upgrades
+  floorPanelsContainer.style.display = bulk ? 'none' : '';
+  bulkEl.style.display = bulk ? 'flex' : 'none';
+
+  // Update bulk buttons
+  if (bulk) {
+    for (const a of amenities) {
+      const btn = bulkButtons.get(a.id)!;
+      if (state.floors < a.unlockFloors) {
+        btn.style.display = 'none';
+        continue;
+      }
+      btn.style.display = '';
+      const missing = floorsMissingAmenity(a);
+      if (missing === 0) {
+        btn.disabled = true;
+        btn.className = 'bulk-btn all-done';
+        const key = `${a.id}:done`;
+        if (btn.dataset.key !== key) {
+          btn.dataset.key = key;
+          btn.innerHTML = `
+            <span class="bulk-icon">${a.icon}</span>
+            <span class="bulk-info">
+              <span class="bulk-name">${a.name}</span>
+              <span class="bulk-detail">All floors installed &#x2713;</span>
+            </span>
+          `;
+        }
+      } else {
+        const cost = getBulkAmenityCost(a);
+        const canAfford = state.money >= cost;
+        btn.disabled = !canAfford;
+        btn.className = 'bulk-btn';
+        const key = `${a.id}:${missing}:${formatMoney(cost)}`;
+        if (btn.dataset.key !== key) {
+          btn.dataset.key = key;
+          btn.innerHTML = `
+            <span class="bulk-icon">${a.icon}</span>
+            <span class="bulk-info">
+              <span class="bulk-name">${a.name}</span>
+              <span class="bulk-detail"><span class="cost-val">${formatMoney(cost)}</span> · <span class="rent-val">+$${a.rentBonus}/s</span> · <span class="count-val">${missing} floors</span></span>
+            </span>
+          `;
+        }
+      }
+    }
   }
 }
 

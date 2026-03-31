@@ -148,6 +148,56 @@
       opacity: 0.6;
     }
 
+    /* ── Bulk upgrades (right panel, post floor 10) ── */
+    #bulk-upgrades {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .bulk-btn {
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #fff;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.15s;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .bulk-btn:hover:not(:disabled) {
+      background: rgba(255,255,255,0.15);
+      transform: scale(1.02);
+    }
+
+    .bulk-btn:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+
+    .bulk-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .bulk-btn .bulk-icon { font-size: 18px; }
+    .bulk-btn .bulk-info { display: flex; flex-direction: column; gap: 1px; }
+    .bulk-btn .bulk-name { font-weight: 600; font-size: 13px; }
+    .bulk-btn .bulk-detail { font-size: 11px; color: #aaa; }
+    .bulk-btn .bulk-detail .cost-val { color: #ffd700; font-weight: 600; }
+    .bulk-btn .bulk-detail .rent-val { color: #7efa7e; }
+    .bulk-btn .bulk-detail .count-val { color: #8cf; }
+
+    .bulk-btn.all-done {
+      border-color: rgba(255,215,0,0.3);
+      opacity: 0.6;
+    }
+
     /* ── Floor upgrade panels (floating next to building) ── */
     #floor-panels {
       position: absolute;
@@ -346,6 +396,7 @@
         </div>
       </div>
       <div id="shop"></div>
+      <div id="bulk-upgrades" style="display:none"></div>
     </div>
   </div>
   <script type="module" src="/src/main.ts"></script>
