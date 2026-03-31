@@ -427,27 +427,80 @@
 
     .money-pop.cafe-pop { color: #7efa7e; }
 
+    /* ── Ad boost button ── */
+    .ad-btn {
+      background: linear-gradient(135deg, rgba(255,120,50,0.85), rgba(255,80,80,0.85)) !important;
+      border: 2px solid rgba(255,200,100,0.6) !important;
+      text-align: center !important;
+      position: relative;
+      overflow: visible;
+    }
+    .ad-btn:hover:not(:disabled) {
+      background: linear-gradient(135deg, rgba(255,140,70,0.95), rgba(255,100,100,0.95)) !important;
+      transform: scale(1.04) !important;
+    }
+    .ad-btn:active:not(:disabled) {
+      transform: scale(0.93) !important;
+    }
+    .ad-btn.ad-active {
+      animation: ad-glow 1s infinite;
+    }
+    @keyframes ad-glow {
+      0%, 100% { box-shadow: 0 0 8px rgba(255,120,50,0.4); }
+      50% { box-shadow: 0 0 18px rgba(255,120,50,0.7); }
+    }
+    .ad-title {
+      display: block;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+    .ad-stats {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      margin-top: 2px;
+    }
+    .ad-boost { color: #fff; font-weight: 700; }
+    .ad-timer { color: rgba(255,255,255,0.8); }
+    .ad-clicks {
+      display: block;
+      font-size: 10px;
+      color: rgba(255,255,255,0.6);
+      margin-top: 1px;
+    }
+
+    .ad-click-pop {
+      position: absolute;
+      font-size: 16px;
+      font-weight: 800;
+      color: #ffd700;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+      pointer-events: none;
+      animation: ad-pop-fly 0.8s ease-out forwards;
+      z-index: 100;
+    }
+    @keyframes ad-pop-fly {
+      0% { transform: translate(-50%, 0) scale(1.2); opacity: 1; }
+      100% { transform: translate(-50%, -40px) scale(0.8); opacity: 0; }
+    }
+
     /* ── Mobile ── */
     @media (max-width: 600px) {
       #panel {
         right: 8px;
-        left: 8px;
-        top: auto;
+        top: 8px;
         bottom: 8px;
-        width: auto;
+        width: 180px;
       }
       #stats {
-        padding: 10px 12px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px 12px;
-        align-items: baseline;
+        padding: 8px 10px;
       }
-      #stats .money { font-size: 22px; }
-      #stats .income { margin-top: 0; }
-      #stats .info-row { margin-top: 0; }
-      #vacancy-bar { margin-top: 0; width: 50px; }
-      #vacancy-label { margin-top: 0; }
+      #stats .money { font-size: 20px; }
+      #stats .income { font-size: 12px; }
+      #stats .info-row { font-size: 11px; }
+      .shop-btn { padding: 6px 8px; font-size: 11px; }
+      .hood-btn { padding: 6px 8px; font-size: 11px; }
 
       .floor-upgrade-btn {
         width: 28px;

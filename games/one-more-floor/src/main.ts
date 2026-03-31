@@ -10,32 +10,33 @@ const CONFIG = {
   incomeTickRate: 0.1,      // minimum money increment
 
   // Floors
-  floorBaseCost: 1000,      // first extra floor costs this
-  floorCostScale: 1.8,      // each floor costs this × more (1k, 1.8k, 3.2k, 5.8k...)
+  floorBaseCost: 10000,     // first extra floor costs this
+  floorCostScale: 3.6,      // each floor costs this × more (10k, 36k, 130k, 467k...)
   perFloorCap: 10,          // per-floor UI phase ends here
 
   // Tenants
-  baseFillRate: 0.15,        // base tenants arriving per second (across whole building)
+  baseFillRate: 0.05,        // base tenants arriving per second (across whole building)
   baseChurnRate: 0.02,       // base chance per tenant per minute to leave
   amenityChurnReduction: 0.003, // each installed amenity reduces churn by this much
-  studioSlotBonus: 5,        // each studio level adds this many slots
-  studioBaseCost: 50,        // base cost of studio conversion
-  studioCostScale: 2.0,      // each studio level costs 2x more
+  studioBaseCost: 30000,     // base cost of studio conversion (comparable to full gym install)
+  studioCostScale: 50,       // each studio level costs 50x more
   maxStudioLevel: 4,         // max studio upgrades per floor
 
-  // Ads
-  adBaseCost: 30,            // first ad purchase
-  adCostScale: 1.25,         // each ad level costs more
-  adFillBonus: 0.08,         // each ad level adds this to fill rate
+  // Ads (temporary boost, click-heavy)
+  adCost: 5,                 // flat cost per click
+  adBoostPerClick: 0.15,     // each click adds this to fill rate
+  adBoostMaxDuration: 30,    // timer caps at 30s, doesn't stack beyond
+  adMaxBoost: 3.0,           // max fill rate bonus from ads
+  adDecayRate: 0.05,         // boost decays this much per second naturally
 
   // Amenities (per-floor upgrades)
   amenities: [
     { id: 'hotwater', name: 'Hot Water', icon: '🚿', rentBonus: 3,  baseCost: 4,    costScale: 1.35, unlockFloors: 1 },
     { id: 'heating',  name: 'Heating',   icon: '🔥', rentBonus: 5,  baseCost: 12,   costScale: 1.40, unlockFloors: 1 },
-    { id: 'ac',       name: 'AC',        icon: '❄️', rentBonus: 8,  baseCost: 35,   costScale: 1.45, unlockFloors: 3 },
-    { id: 'balcony',  name: 'Balcony',   icon: '🌿', rentBonus: 12, baseCost: 80,   costScale: 1.50, unlockFloors: 5 },
-    { id: 'laundry',  name: 'Laundry',   icon: '👕', rentBonus: 10, baseCost: 200,  costScale: 1.50, unlockFloors: 8 },
-    { id: 'gym',      name: 'Gym',       icon: '💪', rentBonus: 18, baseCost: 500,  costScale: 1.55, unlockFloors: 12 },
+    { id: 'ac',       name: 'AC',        icon: '❄️', rentBonus: 8,  baseCost: 35,   costScale: 1.45, unlockFloors: 1 },
+    { id: 'balcony',  name: 'Balcony',   icon: '🌿', rentBonus: 12, baseCost: 400,  costScale: 1.50, unlockFloors: 1 },
+    { id: 'laundry',  name: 'Laundry',   icon: '👕', rentBonus: 10, baseCost: 1000, costScale: 1.50, unlockFloors: 1 },
+    { id: 'gym',      name: 'Gym',       icon: '💪', rentBonus: 18, baseCost: 2500, costScale: 1.55, unlockFloors: 1 },
   ],
 
   // Neighborhood upgrades
@@ -43,13 +44,13 @@ const CONFIG = {
   // rentBonusPerFloor: flat bonus added to each floor's rent
   neighborhood: [
     { id: 'sidewalk',    name: 'Sidewalk',       icon: '🚶', rentBonusPerFloor: 0.8,  incomeMultiplier: 0.03, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 150,  costScale: 1.00, maxCount: 1,   unlockFloors: 2 },
-    { id: 'streetlight', name: 'Streetlight',   icon: '💡', rentBonusPerFloor: 0.5,  incomeMultiplier: 0.02, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 50,   costScale: 1.35, maxCount: 50,  unlockFloors: 2 },
-    { id: 'tree',        name: 'Tree',          icon: '🌳', rentBonusPerFloor: 0.3,  incomeMultiplier: 0.01, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 25,   costScale: 1.30, maxCount: 50,  unlockFloors: 1 },
-    { id: 'bench',       name: 'Park Bench',    icon: '🪑', rentBonusPerFloor: 0.2,  incomeMultiplier: 0.015,ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 40,   costScale: 1.32, maxCount: 30,  unlockFloors: 3 },
-    { id: 'parking',     name: 'Parking Space', icon: '🅿️', rentBonusPerFloor: 0.8,  incomeMultiplier: 0.03, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 200,  costScale: 1.30, maxCount: 100, unlockFloors: 5 },
-    { id: 'cafe',        name: 'Café',          icon: '☕', rentBonusPerFloor: 1.0,  incomeMultiplier: 0.05, ownIncome: 10,  ownIncomeFloorScale: 1.0, baseCost: 1000, costScale: 1.45, maxCount: 20,  unlockFloors: 8 },
-    { id: 'fountain',    name: 'Fountain',      icon: '⛲', rentBonusPerFloor: 1.5,  incomeMultiplier: 0.04, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 600,  costScale: 1.38, maxCount: 20,  unlockFloors: 6 },
-    { id: 'playground',  name: 'Playground',    icon: '🎠', rentBonusPerFloor: 1.0,  incomeMultiplier: 0.03, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 400,  costScale: 1.35, maxCount: 20,  unlockFloors: 4 },
+    { id: 'streetlight', name: 'Streetlight',   icon: '💡', rentBonusPerFloor: 0.5,  incomeMultiplier: 0.02, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 50,   costScale: 1.35, maxCount: 500, unlockFloors: 2 },
+    { id: 'tree',        name: 'Tree',          icon: '🌳', rentBonusPerFloor: 0.3,  incomeMultiplier: 0.01, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 25,   costScale: 1.30, maxCount: 500, unlockFloors: 1 },
+    { id: 'bench',       name: 'Park Bench',    icon: '🪑', rentBonusPerFloor: 0.2,  incomeMultiplier: 0.015,ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 40,   costScale: 1.32, maxCount: 500, unlockFloors: 3 },
+    { id: 'parking',     name: 'Parking Space', icon: '🅿️', rentBonusPerFloor: 0.8,  incomeMultiplier: 0.03, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 200,  costScale: 1.30, maxCount: 500, unlockFloors: 5 },
+    { id: 'cafe',        name: 'Café',          icon: '☕', rentBonusPerFloor: 1.0,  incomeMultiplier: 0.05, ownIncome: 10,  ownIncomeFloorScale: 1.0, baseCost: 1000, costScale: 1.45, maxCount: 500, unlockFloors: 8 },
+    { id: 'fountain',    name: 'Fountain',      icon: '⛲', rentBonusPerFloor: 1.5,  incomeMultiplier: 0.04, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 600,  costScale: 1.38, maxCount: 500, unlockFloors: 6 },
+    { id: 'playground',  name: 'Playground',    icon: '🎠', rentBonusPerFloor: 1.0,  incomeMultiplier: 0.03, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 400,  costScale: 1.35, maxCount: 500, unlockFloors: 4 },
   ],
 
   // Café sub-upgrades (each one multiplies café income)
@@ -82,10 +83,10 @@ interface AmenityDef {
 }
 
 interface FloorState {
-  amenities: Set<string>;
+  amenityInstalls: Map<string, number>; // amenity id → number of apartments with this amenity
   tenants: number;       // current occupied slots
-  maxTenants: number;    // base 10, increased by studio upgrades
-  studioLevel: number;   // 0 = base (10 slots), 1 = 15, 2 = 20, 3 = 25, 4 = 30
+  maxTenants: number;    // 10 base + studio additions
+  studioLevel: number;
 }
 
 interface NeighborhoodDef {
@@ -118,21 +119,38 @@ interface GameState {
   money: number;
   floorCount: number;
   floorStates: FloorState[];
-  adLevel: number;
+  adBoost: number;        // current fill rate bonus from ads
+  adTimer: number;        // seconds remaining on boost
+  adClicks: number;       // total clicks (for display)
 }
 
 const BASE_RENT = CONFIG.baseRent;
 const PER_FLOOR_CAP = CONFIG.perFloorCap;
 
+function getStudioAddition(level: number): number {
+  // Level 1: +20, Level 2: +40, Level 3: +80, Level 4: +160
+  return 20 * Math.pow(2, level - 1);
+}
+
+function getTotalMaxTenants(studioLevel: number): number {
+  let total = 10; // base
+  for (let i = 1; i <= studioLevel; i++) {
+    total += getStudioAddition(i);
+  }
+  return total;
+}
+
 function makeFloorState(tenants: number = 0): FloorState {
-  return { amenities: new Set(), tenants, maxTenants: 10, studioLevel: 0 };
+  return { amenityInstalls: new Map(), tenants, maxTenants: 10, studioLevel: 0 };
 }
 
 const state: GameState = {
   money: 0,
   floorCount: 1,
-  floorStates: [makeFloorState(1)], // floor 0 starts with 1 tenant
-  adLevel: 0,
+  floorStates: [makeFloorState(1)],
+  adBoost: 0,
+  adTimer: 0,
+  adClicks: 0,
 };
 
 const amenities: AmenityDef[] = CONFIG.amenities.map(a => ({ ...a, totalInstalled: 0 }));
@@ -145,9 +163,21 @@ function getTotalSlots(): number {
   return state.floorStates.reduce((sum, f) => sum + f.maxTenants, 0);
 }
 
-// Fill rate: base + ad bonus
+// Fill rate: base + temporary ad boost
 function getFillRate(): number {
-  return CONFIG.baseFillRate + state.adLevel * CONFIG.adFillBonus;
+  return CONFIG.baseFillRate + (state.adTimer > 0 ? state.adBoost : 0);
+}
+
+// Tick ad boost decay
+function tickAdBoost(delta: number) {
+  if (state.adTimer > 0) {
+    state.adTimer = Math.max(0, state.adTimer - delta);
+    // Boost decays slowly even while active
+    state.adBoost = Math.max(0, state.adBoost - CONFIG.adDecayRate * delta);
+    if (state.adTimer <= 0) {
+      state.adBoost = 0;
+    }
+  }
 }
 
 // ── Neighborhood Upgrades ───────────────────────────────────
@@ -170,7 +200,7 @@ const HOOD_VISUALS: Record<string, { description: string; model: string | null; 
     { x: -3, y: 0, z: -0.2, ry: 1 }, { x: 3, y: 0, z: -0.2, ry: 2 },
     { x: 0, y: 0, z: -1.5, ry: 0 }, { x: 0, y: 0, z: -2.2, ry: 1 },
   ]},
-  bench: { description: 'A place to sit', model: 'models/planter.glb', scaleOverride: 0.8, positions: [
+  bench: { description: 'A place to sit', model: null, positions: [
     { x: -1.5, y: 0, z: -0.8, ry: 0.3 }, { x: 1.5, y: 0, z: -0.8, ry: -0.3 },
     { x: -2.5, y: 0, z: 0, ry: 0 }, { x: 2.5, y: 0, z: 0, ry: Math.PI },
     { x: -0.8, y: 0, z: -1.5, ry: 0.5 }, { x: 0.8, y: 0, z: -1.5, ry: -0.5 },
@@ -287,7 +317,7 @@ async function spawnNeighborhoodModel(n: NeighborhoodDef) {
     return;
   }
 
-  if (!n.model && !['fountain', 'playground'].includes(n.id)) return;
+  if (!n.model && !['fountain', 'playground', 'bench'].includes(n.id)) return;
 
   // Only spawn a 3D model for first N predefined positions, or every 5th purchase after that
   if (n.count > n.positions.length && n.count % 5 !== 0) return;
@@ -345,6 +375,34 @@ async function spawnNeighborhoodModel(n: NeighborhoodDef) {
       top.position.y = 0.04 + 0.35 + 0.06;
       group.add(top);
       obj = group;
+    } else if (n.id === 'bench') {
+      // Park bench
+      const group = new THREE.Group();
+      const benchSeat = new THREE.Mesh(
+        new THREE.BoxGeometry(0.4, 0.03, 0.15),
+        new THREE.MeshLambertMaterial({ color: 0x8B4513 })
+      );
+      benchSeat.position.set(0, 0.18, 0);
+      benchSeat.castShadow = true;
+      group.add(benchSeat);
+      const backrest = new THREE.Mesh(
+        new THREE.BoxGeometry(0.4, 0.15, 0.02),
+        new THREE.MeshLambertMaterial({ color: 0x8B4513 })
+      );
+      backrest.position.set(0, 0.28, -0.065);
+      backrest.castShadow = true;
+      group.add(backrest);
+      // Two legs
+      for (const lx of [-0.15, 0.15]) {
+        const leg = new THREE.Mesh(
+          new THREE.BoxGeometry(0.03, 0.18, 0.12),
+          new THREE.MeshLambertMaterial({ color: 0x555555 })
+        );
+        leg.position.set(lx, 0.09, 0);
+        leg.castShadow = true;
+        group.add(leg);
+      }
+      obj = group;
     } else {
       // Playground — swing set
       const group = new THREE.Group();
@@ -398,9 +456,9 @@ function getFloorRentPerTenant(floorIndex: number): number {
   const floor = state.floorStates[floorIndex];
   if (floor) {
     for (const a of amenities) {
-      if (floor.amenities.has(a.id)) {
-        rent += a.rentBonus;
-      }
+      const installs = floor.amenityInstalls.get(a.id) || 0;
+      const coverage = floor.maxTenants > 0 ? installs / floor.maxTenants : 0;
+      rent += a.rentBonus * coverage;
     }
   }
   return rent;
@@ -434,9 +492,20 @@ function getAverageRentPerTenant(): number {
 }
 
 // ── Upgrade Costs ────────────────────────────────────────────
-function getAmenityCost(a: AmenityDef, floorIndex: number): number {
+function getAmenityCostPerUnit(a: AmenityDef, floorIndex: number): number {
+  const floor = state.floorStates[floorIndex];
   const floorMultiplier = Math.pow(CONFIG.floorCostScale, floorIndex);
-  return Math.floor(a.baseCost * floorMultiplier);
+  const studioMultiplier = floor ? Math.pow(5, floor.studioLevel) : 1; // 5x per studio level
+  return Math.floor(a.baseCost * floorMultiplier * studioMultiplier);
+}
+
+// Total cost to install amenity on all remaining apartments on a floor
+function getAmenityFullCost(a: AmenityDef, floorIndex: number): number {
+  const floor = state.floorStates[floorIndex];
+  if (!floor) return 0;
+  const installed = floor.amenityInstalls.get(a.id) || 0;
+  const missing = floor.maxTenants - installed;
+  return getAmenityCostPerUnit(a, floorIndex) * missing;
 }
 
 function getStudioCost(floorIndex: number, studioLevel: number): number {
@@ -444,8 +513,12 @@ function getStudioCost(floorIndex: number, studioLevel: number): number {
   return Math.floor(CONFIG.studioBaseCost * floorMultiplier * Math.pow(CONFIG.studioCostScale, studioLevel));
 }
 
+let peakMoney = 0; // track highest money ever reached
+
 function getAdCost(): number {
-  return Math.floor(CONFIG.adBaseCost * Math.pow(CONFIG.adCostScale, state.adLevel));
+  // Scales with progression — costs more as you get richer
+  const scaleFactor = Math.max(1, Math.floor(peakMoney / 1000));
+  return Math.max(CONFIG.adCost, Math.floor(CONFIG.adCost * Math.pow(scaleFactor, 0.4)));
 }
 
 let floorsPurchased = 0;
@@ -458,8 +531,10 @@ function getFloorCost(): number {
 function isFloorFullyUpgraded(floorIndex: number): boolean {
   const floor = state.floorStates[floorIndex];
   if (!floor) return false;
-  const unlocked = amenities.filter(a => state.floorCount >= a.unlockFloors);
-  return unlocked.every(a => floor.amenities.has(a.id));
+  for (const a of amenities) {
+    if ((floor.amenityInstalls.get(a.id) || 0) < floor.maxTenants) return false;
+  }
+  return true;
 }
 
 function isFloorComplete(floorIndex: number): boolean {
@@ -468,10 +543,8 @@ function isFloorComplete(floorIndex: number): boolean {
 }
 
 function allFloorsFullyUpgraded(): boolean {
-  const unlocked = amenities.filter(a => state.floorCount >= a.unlockFloors);
   for (let i = 0; i < state.floorCount; i++) {
-    const floor = state.floorStates[i];
-    if (!floor || !unlocked.every(a => floor.amenities.has(a.id))) return false;
+    if (!isFloorFullyUpgraded(i)) return false;
   }
   return true;
 }
@@ -487,24 +560,27 @@ function isInBulkPhase(): boolean {
   return false;
 }
 
-// How many floors are missing a given amenity
+// Total number of missing apartment installs for an amenity across all floors
 function floorsMissingAmenity(a: AmenityDef): number {
   let count = 0;
   for (let i = 0; i < state.floorCount; i++) {
     const floor = state.floorStates[i];
-    if (!floor || !floor.amenities.has(a.id)) count++;
+    if (!floor) continue;
+    const installs = floor.amenityInstalls.get(a.id) || 0;
+    count += floor.maxTenants - installs;
   }
   return count;
 }
 
-// Cost to install an amenity on all missing floors (uses per-floor scaling)
+// Cost to install an amenity on all missing apartments across all floors
 function getBulkAmenityCost(a: AmenityDef): number {
   let total = 0;
   for (let i = 0; i < state.floorCount; i++) {
     const floor = state.floorStates[i];
-    if (!floor || !floor.amenities.has(a.id)) {
-      total += getAmenityCost(a, i);
-    }
+    if (!floor) continue;
+    const installs = floor.amenityInstalls.get(a.id) || 0;
+    const missing = floor.maxTenants - installs;
+    total += getAmenityCostPerUnit(a, i) * missing;
   }
   return total;
 }
@@ -901,9 +977,8 @@ function getNextUpgrade(floorIndex: number): AmenityDef | null {
   const floor = state.floorStates[floorIndex];
   if (!floor) return null;
   for (const a of amenities) {
-    if (state.floorCount >= a.unlockFloors && !floor.amenities.has(a.id)) {
-      return a;
-    }
+    const installs = floor.amenityInstalls.get(a.id) || 0;
+    if (installs < floor.maxTenants) return a;
   }
   return null;
 }
@@ -934,21 +1009,23 @@ function ensureFloorPanels() {
 
       const next = getNextUpgrade(floorIndex);
       if (next) {
-        // Buy amenity
-        const cost = getAmenityCost(next, floorIndex);
-        if (state.money >= cost && !floor.amenities.has(next.id)) {
+        // Buy amenity — install on ALL remaining apartments at once
+        const cost = getAmenityFullCost(next, floorIndex);
+        const installs = floor.amenityInstalls.get(next.id) || 0;
+        const missing = floor.maxTenants - installs;
+        if (state.money >= cost && missing > 0) {
           state.money -= cost;
-          floor.amenities.add(next.id);
-          next.totalInstalled++;
+          floor.amenityInstalls.set(next.id, floor.maxTenants);
+          next.totalInstalled += missing;
           renderUI();
         }
       } else if (isFloorFullyUpgraded(floorIndex) && floor.studioLevel < CONFIG.maxStudioLevel) {
-        // Buy studio upgrade
+        // Buy studio upgrade — does NOT clear amenities
         const cost = getStudioCost(floorIndex, floor.studioLevel);
         if (state.money >= cost) {
           state.money -= cost;
           floor.studioLevel++;
-          floor.maxTenants = 10 + floor.studioLevel * CONFIG.studioSlotBonus;
+          floor.maxTenants = getTotalMaxTenants(floor.studioLevel);
           renderUI();
         }
       }
@@ -997,8 +1074,9 @@ function updateFloorPanelContent() {
     panel.rentLabel.textContent = `${floor.tenants}/${floor.maxTenants}`;
     panel.rentLabel.classList.toggle('vacant', !hasTenants);
 
-    // Installed icons — show small icons for purchased amenities, or star if complete
-    const iconKey = complete ? 'complete' : (fullyUpgraded ? `full:s${floor.studioLevel}` : Array.from(floor.amenities).join(',') + `:s${floor.studioLevel}`);
+    // Installed icons — show coverage per amenity, or star if complete
+    const installEntries = amenities.map(a => `${a.id}:${floor.amenityInstalls.get(a.id) || 0}`).join(',');
+    const iconKey = complete ? 'complete' : `${installEntries}:s${floor.studioLevel}:m${floor.maxTenants}`;
     if (panel.iconsEl.dataset.key !== iconKey) {
       panel.iconsEl.dataset.key = iconKey;
       if (complete) {
@@ -1006,7 +1084,8 @@ function updateFloorPanelContent() {
       } else {
         let icons = '';
         for (const a of amenities) {
-          if (floor.amenities.has(a.id)) {
+          const installs = floor.amenityInstalls.get(a.id) || 0;
+          if (installs >= floor.maxTenants) {
             icons += `<span class="floor-installed-icon">${a.icon}</span>`;
           }
         }
@@ -1020,11 +1099,11 @@ function updateFloorPanelContent() {
     // Buy button — show next available upgrade or studio
     const next = getNextUpgrade(i);
     if (next) {
-      const cost = getAmenityCost(next, i);
+      const cost = getAmenityFullCost(next, i);
       const canAfford = state.money >= cost;
       panel.buyBtn.style.display = '';
       panel.buyBtn.disabled = !canAfford;
-      const key = `${next.id}:${formatMoney(cost)}:f${i}`;
+      const key = `${next.id}:${formatMoney(cost)}:f${i}:m${floor.maxTenants}`;
       if (panel.buyBtn.dataset.key !== key) {
         panel.buyBtn.dataset.key = key;
         panel.buyBtn.innerHTML = `
@@ -1042,6 +1121,7 @@ function updateFloorPanelContent() {
       const canAfford = state.money >= cost;
       panel.buyBtn.style.display = '';
       panel.buyBtn.disabled = !canAfford;
+      const addition = getStudioAddition(floor.studioLevel + 1);
       const key = `studio:${floor.studioLevel}:${formatMoney(cost)}:f${i}`;
       if (panel.buyBtn.dataset.key !== key) {
         panel.buyBtn.dataset.key = key;
@@ -1049,7 +1129,7 @@ function updateFloorPanelContent() {
           <span class="btn-icon">🏠</span>
           <span class="btn-info">
             <span class="btn-name">Studios Lv${floor.studioLevel + 1}</span>
-            <span class="btn-detail"><span class="cost-val">${formatMoney(cost)}</span> · <span class="rent-val">+${CONFIG.studioSlotBonus} slots</span></span>
+            <span class="btn-detail"><span class="cost-val">${formatMoney(cost)}</span> · <span class="rent-val">+${addition} slots</span></span>
           </span>
         `;
       }
@@ -1103,7 +1183,19 @@ adBtn.addEventListener('click', () => {
   const cost = getAdCost();
   if (state.money >= cost) {
     state.money -= cost;
-    state.adLevel++;
+    state.adBoost = Math.min(CONFIG.adMaxBoost, state.adBoost + CONFIG.adBoostPerClick);
+    state.adTimer = CONFIG.adBoostMaxDuration;
+    state.adClicks++;
+
+    // Spawn a flashy number on the button
+    const pop = document.createElement('div');
+    pop.className = 'ad-click-pop';
+    pop.textContent = `+${(CONFIG.adBoostPerClick).toFixed(2)}/s`;
+    pop.style.left = `${adBtn.offsetLeft + adBtn.offsetWidth / 2}px`;
+    pop.style.top = `${adBtn.offsetTop}px`;
+    adBtn.parentElement!.appendChild(pop);
+    setTimeout(() => pop.remove(), 800);
+
     renderUI();
   }
 });
@@ -1122,12 +1214,15 @@ for (const a of amenities) {
     const cost = getBulkAmenityCost(a);
     if (state.money < cost) return;
     state.money -= cost;
-    // Install on all missing floors
+    // Fill all apartments on all floors with this amenity
     for (let i = 0; i < state.floorCount; i++) {
       const floor = state.floorStates[i];
-      if (floor && !floor.amenities.has(a.id)) {
-        floor.amenities.add(a.id);
-        a.totalInstalled++;
+      if (!floor) continue;
+      const current = floor.amenityInstalls.get(a.id) || 0;
+      const missing = floor.maxTenants - current;
+      if (missing > 0) {
+        floor.amenityInstalls.set(a.id, floor.maxTenants);
+        a.totalInstalled += missing;
       }
     }
     renderUI();
@@ -1149,7 +1244,7 @@ bulkStudioBtn.addEventListener('click', () => {
     const floor = state.floorStates[i];
     if (floor && floor.studioLevel < CONFIG.maxStudioLevel) {
       floor.studioLevel++;
-      floor.maxTenants = 10 + floor.studioLevel * CONFIG.studioSlotBonus;
+      floor.maxTenants = getTotalMaxTenants(floor.studioLevel);
     }
   }
   renderUI();
@@ -1299,6 +1394,15 @@ function renderNeighborhoodUI() {
       }
     }
   }
+
+  // Move maxed buttons to the bottom of the container
+  const hoodContainer = document.getElementById('neighborhood-upgrades')!;
+  for (const n of neighborhoodUpgrades) {
+    const btn = hoodButtons.get(n.id)!;
+    if (n.count >= n.maxCount && btn.style.display !== 'none') {
+      hoodContainer.appendChild(btn); // moves to end
+    }
+  }
 }
 
 function renderUI() {
@@ -1352,23 +1456,35 @@ function renderUI() {
     }
   }
 
-  // Online Ads button — visible after floor 1
-  if (state.floorCount > 1) {
-    adBtn.style.display = '';
-    const adCost = getAdCost();
-    const canAffordAd = state.money >= adCost;
-    adBtn.disabled = !canAffordAd;
-    const adKey = `ad:${state.adLevel}:${formatMoney(adCost)}`;
-    if (adBtn.dataset.key !== adKey) {
-      adBtn.dataset.key = adKey;
-      adBtn.innerHTML = `
-        📱 Online Ads
-        <span class="cost">${formatMoney(adCost)}</span>
-        <span class="desc">+${CONFIG.adFillBonus.toFixed(2)}/s fill rate · Level ${state.adLevel} · Fill: ${fillRate.toFixed(2)}/s</span>
-      `;
+  // Hire Agents button — hidden when tenants are full
+  {
+    const totalTenants = getTotalTenants();
+    const totalSlots = getTotalSlots();
+    if (totalTenants >= totalSlots) {
+      adBtn.style.display = 'none';
+    } else {
+      adBtn.style.display = '';
+      const adCost = getAdCost();
+      const canAffordAd = state.money >= adCost;
+      adBtn.disabled = !canAffordAd;
+      const boostActive = state.adTimer > 0;
+      adBtn.className = boostActive ? 'shop-btn ad-btn ad-active' : 'shop-btn ad-btn';
+      const timerStr = boostActive ? `⏱ ${Math.ceil(state.adTimer)}s` : 'Inactive';
+      const boostStr = boostActive ? `+${state.adBoost.toFixed(2)}/s` : '+0.00/s';
+      const adKey = `ad:${state.adClicks}:${Math.ceil(state.adTimer)}:${canAffordAd}`;
+      if (adBtn.dataset.key !== adKey) {
+        adBtn.dataset.key = adKey;
+        adBtn.innerHTML = `
+          <span class="ad-title">🏠 HIRE AGENTS</span>
+          <span class="cost">${formatMoney(adCost)}</span>
+          <span class="ad-stats">
+            <span class="ad-boost">${boostStr} fill boost</span>
+            <span class="ad-timer">${timerStr}</span>
+          </span>
+          <span class="ad-clicks">${state.adClicks} clicks</span>
+        `;
+      }
     }
-  } else {
-    adBtn.style.display = 'none';
   }
 
   // Show/hide per-floor panels vs bulk upgrades
@@ -1395,7 +1511,7 @@ function renderUI() {
             <span class="bulk-icon">${a.icon}</span>
             <span class="bulk-info">
               <span class="bulk-name">${a.name}</span>
-              <span class="bulk-detail">All floors installed &#x2713;</span>
+              <span class="bulk-detail">All apartments installed &#x2713;</span>
             </span>
           `;
         }
@@ -1411,7 +1527,7 @@ function renderUI() {
             <span class="bulk-icon">${a.icon}</span>
             <span class="bulk-info">
               <span class="bulk-name">${a.name}</span>
-              <span class="bulk-detail"><span class="cost-val">${formatMoney(cost)}</span> · <span class="rent-val">+$${a.rentBonus}/tenant</span> · <span class="count-val">${missing} floors</span></span>
+              <span class="bulk-detail"><span class="cost-val">${formatMoney(cost)}</span> · <span class="rent-val">+$${a.rentBonus}/tenant</span> · <span class="count-val">${missing} apartments</span></span>
             </span>
           `;
         }
@@ -1446,7 +1562,7 @@ function renderUI() {
           <span class="bulk-icon">🏠</span>
           <span class="bulk-info">
             <span class="bulk-name">Studios</span>
-            <span class="bulk-detail"><span class="cost-val">${formatMoney(cost)}</span> · <span class="rent-val">+${CONFIG.studioSlotBonus} slots</span> · <span class="count-val">${studioNeeding} floors</span></span>
+            <span class="bulk-detail"><span class="cost-val">${formatMoney(cost)}</span> · <span class="count-val">${studioNeeding} floors</span></span>
           </span>
         `;
       }
@@ -1503,8 +1619,12 @@ function tickChurn(delta: number) {
     const floor = state.floorStates[i];
     if (!floor || floor.tenants <= 0) continue;
 
-    const installedCount = floor.amenities.size;
-    const churnChance = Math.max(0.001, CONFIG.baseChurnRate - installedCount * CONFIG.amenityChurnReduction);
+    let amenityCount = 0;
+    for (const a of amenities) {
+      const coverage = floor.maxTenants > 0 ? (floor.amenityInstalls.get(a.id) || 0) / floor.maxTenants : 0;
+      amenityCount += coverage; // fractional credit
+    }
+    const churnChance = Math.max(0.001, CONFIG.baseChurnRate - amenityCount * CONFIG.amenityChurnReduction);
 
     // Scale to per-check-interval (churnRate is per minute, interval is in seconds)
     const churnPerCheck = churnChance * (CONFIG.churnCheckInterval / 60);
@@ -1548,8 +1668,12 @@ function gameLoop(time: number) {
   if (incomeAccumulator >= 0.1) {
     const amount = Math.floor(incomeAccumulator * 10) / 10;
     state.money += amount;
+    if (state.money > peakMoney) peakMoney = state.money;
     incomeAccumulator -= amount;
   }
+
+  // ── Ad boost decay ──
+  tickAdBoost(delta);
 
   // ── Tenant fill tick ──
   tickTenantFill(delta);
@@ -1609,9 +1733,10 @@ window.addEventListener('resize', () => {
   for (let i = 0; i < state.floorCount; i++) {
     const floor = state.floorStates[i];
     for (const a of amenities) {
-      if (state.floorCount >= a.unlockFloors && !floor.amenities.has(a.id)) {
-        floor.amenities.add(a.id);
-        a.totalInstalled++;
+      const current = floor.amenityInstalls.get(a.id) || 0;
+      if (current < floor.maxTenants) {
+        floor.amenityInstalls.set(a.id, floor.maxTenants);
+        a.totalInstalled += (floor.maxTenants - current);
       }
     }
   }
