@@ -13,6 +13,24 @@ interface AmenityDef {
   unlockFloors: number;
 }
 
+interface NeighborhoodDef {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  model: string | null; // null = procedural geometry
+  rentBonusPerFloor: number; // added to every floor's rent per purchase
+  ownIncome: number; // base income this generates (e.g. café)
+  ownIncomeFloorScale: number; // multiplied by floors (more tenants = more customers)
+  baseCost: number;
+  costScale: number;
+  maxCount: number; // max times you can buy this
+  count: number;
+  unlockFloors: number;
+  positions: { x: number; y: number; z: number; ry: number }[];
+  scaleOverride?: number;
+}
+
 interface GameState {
   money: number;
   floors: number;
@@ -39,9 +57,188 @@ const amenities: AmenityDef[] = [
   { id: 'gym', name: 'Gym', icon: '\u{1F4AA}', rentBonus: 7, baseCost: 500, costScale: 1.16, totalInstalled: 0, unlockFloors: 12 },
 ];
 
+// ── Neighborhood Upgrades ───────────────────────────────────
+const neighborhoodUpgrades: NeighborhoodDef[] = [
+  {
+    id: 'streetlight', name: 'Streetlight', icon: '💡',
+    description: 'Lights up the street',
+    model: 'models/light-curved.glb',
+    rentBonusPerFloor: 0.3, ownIncome: 0, ownIncomeFloorScale: 0,
+    baseCost: 30, costScale: 1.15, maxCount: 8, count: 0, unlockFloors: 2,
+    positions: [
+      { x: -1.5, y: 0, z: 1.8, ry: 0 }, { x: 1.5, y: 0, z: 1.8, ry: Math.PI },
+      { x: -3, y: 0, z: 1.8, ry: 0 }, { x: 3, y: 0, z: 1.8, ry: Math.PI },
+      { x: -4.5, y: 0, z: 1.8, ry: 0 }, { x: 4.5, y: 0, z: 1.8, ry: Math.PI },
+      { x: -6, y: 0, z: 1.8, ry: 0 }, { x: 6, y: 0, z: 1.8, ry: Math.PI },
+    ],
+  },
+  {
+    id: 'tree', name: 'Tree', icon: '🌳',
+    description: 'Green and pleasant',
+    model: 'models/tree-large.glb',
+    rentBonusPerFloor: 0.2, ownIncome: 0, ownIncomeFloorScale: 0,
+    baseCost: 15, costScale: 1.1, maxCount: 12, count: 0, unlockFloors: 1,
+    positions: [
+      { x: -1.2, y: 0, z: -0.3, ry: 0 }, { x: 1.2, y: 0, z: -0.3, ry: 0.5 },
+      { x: -2, y: 0, z: 0.3, ry: 1 }, { x: 2, y: 0, z: 0.3, ry: 1.5 },
+      { x: -2.5, y: 0, z: -0.8, ry: 2 }, { x: 2.5, y: 0, z: -0.8, ry: 0.3 },
+      { x: -1.5, y: 0, z: -1.2, ry: 3 }, { x: 1.5, y: 0, z: -1.2, ry: 2 },
+      { x: -3, y: 0, z: -0.2, ry: 1 }, { x: 3, y: 0, z: -0.2, ry: 2 },
+      { x: 0, y: 0, z: -1.5, ry: 0 }, { x: 0, y: 0, z: -2.2, ry: 1 },
+    ],
+  },
+  {
+    id: 'bench', name: 'Park Bench', icon: '🪑',
+    description: 'A place to sit',
+    model: 'models/planter.glb', // using planter as bench stand-in
+    rentBonusPerFloor: 0.15, ownIncome: 0, ownIncomeFloorScale: 0,
+    baseCost: 20, costScale: 1.12, maxCount: 6, count: 0, unlockFloors: 3,
+    scaleOverride: 0.8,
+    positions: [
+      { x: -1.5, y: 0, z: -0.8, ry: 0.3 }, { x: 1.5, y: 0, z: -0.8, ry: -0.3 },
+      { x: -2.5, y: 0, z: 0, ry: 0 }, { x: 2.5, y: 0, z: 0, ry: Math.PI },
+      { x: -0.8, y: 0, z: -1.5, ry: 0.5 }, { x: 0.8, y: 0, z: -1.5, ry: -0.5 },
+    ],
+  },
+  {
+    id: 'parking', name: 'Parking Space', icon: '🅿️',
+    description: 'Underground parking',
+    model: null, // no visual, just occupancy bonus
+    rentBonusPerFloor: 0.5, ownIncome: 0, ownIncomeFloorScale: 0,
+    baseCost: 100, costScale: 1.18, maxCount: 20, count: 0, unlockFloors: 5,
+    positions: [],
+  },
+  {
+    id: 'cafe', name: 'Café', icon: '☕',
+    description: 'Earns income from tenants',
+    model: 'models/building-type-h.glb',
+    rentBonusPerFloor: 0.5, ownIncome: 5, ownIncomeFloorScale: 0.5,
+    baseCost: 500, costScale: 1.25, maxCount: 3, count: 0, unlockFloors: 8,
+    scaleOverride: 0.5,
+    positions: [
+      { x: 2.5, y: 0, z: 0.5, ry: -0.3 },
+      { x: -2.5, y: 0, z: 0.5, ry: 0.3 },
+      { x: 3.5, y: 0, z: -0.5, ry: -0.5 },
+    ],
+  },
+  {
+    id: 'fountain', name: 'Fountain', icon: '⛲',
+    description: 'Beautiful centerpiece',
+    model: null, // procedural
+    rentBonusPerFloor: 1, ownIncome: 0, ownIncomeFloorScale: 0,
+    baseCost: 300, costScale: 1.3, maxCount: 3, count: 0, unlockFloors: 6,
+    positions: [
+      { x: 0, y: 0, z: -1.8, ry: 0 },
+      { x: -2, y: 0, z: -2, ry: 0 },
+      { x: 2, y: 0, z: -2, ry: 0 },
+    ],
+  },
+  {
+    id: 'playground', name: 'Playground', icon: '🎠',
+    description: 'Families love it',
+    model: null, // procedural
+    rentBonusPerFloor: 0.7, ownIncome: 0, ownIncomeFloorScale: 0,
+    baseCost: 200, costScale: 1.2, maxCount: 3, count: 0, unlockFloors: 4,
+    positions: [
+      { x: -2, y: 0, z: -1, ry: 0 },
+      { x: 2.5, y: 0, z: -1.5, ry: 0 },
+      { x: -3, y: 0, z: -1.5, ry: 0 },
+    ],
+  },
+];
+
+const neighborhoodModels: THREE.Object3D[] = []; // spawned 3D models
+
+function getNeighborhoodRentBonus(): number {
+  let bonus = 0;
+  for (const n of neighborhoodUpgrades) {
+    bonus += n.rentBonusPerFloor * n.count;
+  }
+  return bonus;
+}
+
+function getNeighborhoodIncome(): number {
+  let income = 0;
+  for (const n of neighborhoodUpgrades) {
+    if (n.ownIncome > 0 && n.count > 0) {
+      income += n.ownIncome * n.count * (1 + state.floors * n.ownIncomeFloorScale);
+    }
+  }
+  return income;
+}
+
+function getNeighborhoodCost(n: NeighborhoodDef): number {
+  return Math.floor(n.baseCost * Math.pow(n.costScale, n.count));
+}
+
+async function spawnNeighborhoodModel(n: NeighborhoodDef) {
+  const posIndex = n.count - 1;
+  if (posIndex < 0 || posIndex >= n.positions.length) return;
+  const pos = n.positions[posIndex];
+
+  let obj: THREE.Object3D;
+  if (n.model) {
+    obj = await loadModel(n.model);
+    if (n.scaleOverride) {
+      obj.scale.setScalar(n.scaleOverride);
+    }
+  } else {
+    // Procedural geometry for fountain/playground
+    if (n.id === 'fountain') {
+      const group = new THREE.Group();
+      const base = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.3, 0.35, 0.15, 16),
+        new THREE.MeshLambertMaterial({ color: 0x888888 })
+      );
+      base.position.y = 0.075;
+      base.castShadow = true;
+      group.add(base);
+      const pillar = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.05, 0.05, 0.4, 8),
+        new THREE.MeshLambertMaterial({ color: 0x999999 })
+      );
+      pillar.position.y = 0.35;
+      pillar.castShadow = true;
+      group.add(pillar);
+      const top = new THREE.Mesh(
+        new THREE.SphereGeometry(0.08, 8, 8),
+        new THREE.MeshLambertMaterial({ color: 0x6699cc })
+      );
+      top.position.y = 0.55;
+      group.add(top);
+      obj = group;
+    } else {
+      // Playground — colorful shapes
+      const group = new THREE.Group();
+      const slide = new THREE.Mesh(
+        new THREE.BoxGeometry(0.15, 0.4, 0.5),
+        new THREE.MeshLambertMaterial({ color: 0xdd4444 })
+      );
+      slide.position.set(0, 0.2, 0);
+      slide.rotation.x = 0.3;
+      slide.castShadow = true;
+      group.add(slide);
+      const frame = new THREE.Mesh(
+        new THREE.BoxGeometry(0.4, 0.5, 0.05),
+        new THREE.MeshLambertMaterial({ color: 0x4488dd })
+      );
+      frame.position.set(0, 0.25, -0.2);
+      frame.castShadow = true;
+      group.add(frame);
+      obj = group;
+    }
+  }
+
+  obj.position.set(pos.x, pos.y, pos.z);
+  obj.rotation.y = pos.ry;
+  scene.add(obj);
+  neighborhoodModels.push(obj);
+  markDirty();
+}
+
 // ── Economy ─────────────────────────────────────────────────
 function getFloorRent(floorIndex: number): number {
-  let rent = BASE_RENT;
+  let rent = BASE_RENT + getNeighborhoodRentBonus();
   const installed = state.floorAmenities[floorIndex];
   if (installed) {
     for (const a of amenities) {
@@ -59,6 +256,8 @@ function getTotalRentPerSecond(): number {
   for (let i = 0; i < state.occupied; i++) {
     total += getFloorRent(i);
   }
+  // Add neighborhood businesses income
+  total += getNeighborhoodIncome();
   return total;
 }
 
@@ -644,6 +843,78 @@ for (const a of amenities) {
   bulkButtons.set(a.id, btn);
 }
 
+// ── Neighborhood Upgrade Buttons (right panel) ──────────────
+const hoodEl = document.getElementById('neighborhood-upgrades')!;
+const hoodButtons: Map<string, HTMLButtonElement> = new Map();
+
+for (const n of neighborhoodUpgrades) {
+  const btn = document.createElement('button');
+  btn.className = 'hood-btn';
+  btn.addEventListener('click', () => {
+    if (n.count >= n.maxCount) return;
+    const cost = getNeighborhoodCost(n);
+    if (state.money < cost) return;
+    state.money -= cost;
+    n.count++;
+    spawnNeighborhoodModel(n);
+    renderUI();
+  });
+  hoodEl.appendChild(btn);
+  hoodButtons.set(n.id, btn);
+}
+
+function renderNeighborhoodUI() {
+  for (const n of neighborhoodUpgrades) {
+    const btn = hoodButtons.get(n.id)!;
+    if (state.floors < n.unlockFloors) {
+      btn.style.display = 'none';
+      continue;
+    }
+    btn.style.display = '';
+    const maxed = n.count >= n.maxCount;
+    if (maxed) {
+      btn.disabled = true;
+      btn.className = 'hood-btn maxed';
+      const key = `${n.id}:maxed`;
+      if (btn.dataset.key !== key) {
+        btn.dataset.key = key;
+        btn.innerHTML = `
+          <span class="hood-icon">${n.icon}</span>
+          <span class="hood-info">
+            <span class="hood-name">${n.name}</span>
+            <span class="hood-desc">Maxed out</span>
+          </span>
+          <span class="hood-count">${n.count}/${n.maxCount}</span>
+        `;
+      }
+    } else {
+      const cost = getNeighborhoodCost(n);
+      const canAfford = state.money >= cost;
+      btn.disabled = !canAfford;
+      btn.className = 'hood-btn';
+      let bonusText = '';
+      if (n.rentBonusPerFloor > 0) bonusText += `<span class="rent-val">+$${n.rentBonusPerFloor}/floor</span>`;
+      if (n.ownIncome > 0) {
+        const incomePreview = n.ownIncome * (1 + state.floors * n.ownIncomeFloorScale);
+        if (bonusText) bonusText += ' · ';
+        bonusText += `<span class="rent-val">earns $${Math.floor(incomePreview)}/s</span>`;
+      }
+      const key = `${n.id}:${n.count}:${formatMoney(cost)}:${state.floors}`;
+      if (btn.dataset.key !== key) {
+        btn.dataset.key = key;
+        btn.innerHTML = `
+          <span class="hood-icon">${n.icon}</span>
+          <span class="hood-info">
+            <span class="hood-name">${n.name}</span>
+            <span class="hood-detail"><span class="cost-val">${formatMoney(cost)}</span> · ${bonusText}</span>
+          </span>
+          ${n.count > 0 ? `<span class="hood-count">${n.count}/${n.maxCount}</span>` : ''}
+        `;
+      }
+    }
+  }
+}
+
 function renderUI() {
   const income = getTotalRentPerSecond();
   const avgRent = getAverageRent();
@@ -735,6 +1006,9 @@ function renderUI() {
       }
     }
   }
+
+  // Neighborhood
+  renderNeighborhoodUI();
 }
 
 // ── Game Loop ───────────────────────────────────────────────

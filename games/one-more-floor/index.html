@@ -21,12 +21,28 @@
       position: absolute;
       right: 16px;
       top: 16px;
+      bottom: 16px;
       display: flex;
       flex-direction: column;
       gap: 8px;
       pointer-events: auto;
-      width: 200px;
+      width: 220px;
       z-index: 20;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.2) transparent;
+    }
+
+    #panel::-webkit-scrollbar {
+      width: 4px;
+    }
+    #panel::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    #panel::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.2);
+      border-radius: 2px;
     }
 
     #stats {
@@ -146,6 +162,73 @@
       background: rgba(30, 60, 40, 0.6);
       border-color: rgba(100, 220, 130, 0.15);
       opacity: 0.6;
+    }
+
+    /* ── Neighborhood section ── */
+    #neighborhood-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .section-header {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #888;
+      padding: 4px 0;
+    }
+
+    .hood-btn {
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #fff;
+      padding: 8px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.15s;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .hood-btn:hover:not(:disabled) {
+      background: rgba(255,255,255,0.12);
+      transform: scale(1.02);
+    }
+
+    .hood-btn:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+
+    .hood-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .hood-btn .hood-icon { font-size: 18px; line-height: 1; }
+    .hood-btn .hood-info { display: flex; flex-direction: column; gap: 1px; flex: 1; }
+    .hood-btn .hood-name { font-weight: 600; font-size: 12px; }
+    .hood-btn .hood-desc { font-size: 10px; color: #aaa; }
+    .hood-btn .hood-detail { font-size: 10px; color: #aaa; }
+    .hood-btn .hood-detail .cost-val { color: #ffd700; font-weight: 600; }
+    .hood-btn .hood-detail .rent-val { color: #7efa7e; }
+    .hood-btn .hood-count {
+      font-size: 10px;
+      color: #8cf;
+      background: rgba(100,150,255,0.15);
+      border-radius: 4px;
+      padding: 2px 5px;
+      white-space: nowrap;
+    }
+
+    .hood-btn.maxed {
+      border-color: rgba(255,215,0,0.2);
+      opacity: 0.5;
     }
 
     /* ── Bulk upgrades (right panel, post floor 10) ── */
@@ -397,6 +480,10 @@
       </div>
       <div id="shop"></div>
       <div id="bulk-upgrades" style="display:none"></div>
+      <div id="neighborhood-section">
+        <div class="section-header">Neighborhood</div>
+        <div id="neighborhood-upgrades"></div>
+      </div>
     </div>
   </div>
   <script type="module" src="/src/main.ts"></script>
