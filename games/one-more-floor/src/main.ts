@@ -99,7 +99,9 @@ function allFloorsFullyUpgraded(): boolean {
 }
 
 function isInBulkPhase(): boolean {
-  return state.floors >= PER_FLOOR_CAP && allFloorsFullyUpgraded();
+  // Past the cap = already passed the gate, always bulk
+  // At the cap = bulk only if all maxed
+  return state.floors > PER_FLOOR_CAP || (state.floors === PER_FLOOR_CAP && allFloorsFullyUpgraded());
 }
 
 // How many floors are missing a given amenity
