@@ -16,27 +16,27 @@ const CONFIG = {
 
   // Tenants
   baseFillRate: 0.02,        // base tenants arriving per second (across whole building)
-  baseChurnRate: 0.02,       // base chance per tenant per minute to leave
-  amenityChurnReduction: 0.003, // each installed amenity reduces churn by this much
+  baseChurnRate: 0.05,       // base chance per tenant per minute to leave
+  amenityChurnReduction: 0.007, // each installed amenity reduces churn by this much
   studioBaseCost: 150000,    // base cost of studio conversion
   studioCostScale: 50,       // each studio level costs 50x more
   maxStudioLevel: 4,         // max studio upgrades per floor
 
   // Ads (temporary boost, click-heavy)
   adCost: 5,                 // flat cost per click
-  adBoostPerClick: 0.03,     // each click adds this to fill rate
+  adBoostPerClick: 0.08,     // each click adds this to fill rate
   adBoostMaxDuration: 30,    // timer caps at 30s, doesn't stack beyond
-  adMaxBoost: 0.5,           // max fill rate bonus from ads
-  adDecayRate: 0.05,         // boost decays this much per second naturally
+  adMaxBoost: 2.0,           // max fill rate bonus from ads
+  adDecayRate: 0.015,        // boost decays slowly so clicks feel impactful
 
   // Amenities (per-floor upgrades)
   amenities: [
-    { id: 'hotwater', name: 'Hot Water', icon: '🚿', rentBonus: 3,  baseCost: 4,    costScale: 1.35, unlockFloors: 1 },
-    { id: 'heating',  name: 'Heating',   icon: '🔥', rentBonus: 5,  baseCost: 12,   costScale: 1.40, unlockFloors: 1 },
-    { id: 'ac',       name: 'AC',        icon: '❄️', rentBonus: 8,  baseCost: 35,   costScale: 1.45, unlockFloors: 1 },
-    { id: 'balcony',  name: 'Balcony',   icon: '🌿', rentBonus: 12, baseCost: 400,  costScale: 1.50, unlockFloors: 1 },
-    { id: 'laundry',  name: 'Laundry',   icon: '👕', rentBonus: 10, baseCost: 1000, costScale: 1.50, unlockFloors: 1 },
-    { id: 'gym',      name: 'Gym',       icon: '💪', rentBonus: 18, baseCost: 2500, costScale: 1.55, unlockFloors: 1 },
+    { id: 'hotwater', name: 'Hot Water', icon: '🚿', rentBonus: 3.3,  baseCost: 4,    costScale: 1.35, unlockFloors: 1 },
+    { id: 'heating',  name: 'Heating',   icon: '🔥', rentBonus: 5.5,  baseCost: 12,   costScale: 1.40, unlockFloors: 1 },
+    { id: 'ac',       name: 'AC',        icon: '❄️', rentBonus: 8.8,  baseCost: 35,   costScale: 1.45, unlockFloors: 1 },
+    { id: 'balcony',  name: 'Balcony',   icon: '🌿', rentBonus: 13.2, baseCost: 400,  costScale: 1.50, unlockFloors: 1 },
+    { id: 'laundry',  name: 'Laundry',   icon: '👕', rentBonus: 11,   baseCost: 1000, costScale: 1.50, unlockFloors: 1 },
+    { id: 'gym',      name: 'Gym',       icon: '💪', rentBonus: 19.8, baseCost: 2500, costScale: 1.55, unlockFloors: 1 },
   ],
 
   // Neighborhood upgrades
@@ -48,7 +48,7 @@ const CONFIG = {
     { id: 'tree',        name: 'Tree',          icon: '🌳', rentBonusPerFloor: 0.3,  incomeMultiplier: 0.01, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 25,   costScale: 1.30, maxCount: 500, unlockFloors: 1 },
     { id: 'bench',       name: 'Park Bench',    icon: '🪑', rentBonusPerFloor: 0.2,  incomeMultiplier: 0.015,ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 40,   costScale: 1.32, maxCount: 500, unlockFloors: 3 },
     { id: 'parking',     name: 'Parking Space', icon: '🅿️', rentBonusPerFloor: 0.8,  incomeMultiplier: 0.03, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 200,  costScale: 1.30, maxCount: 500, unlockFloors: 5 },
-    { id: 'cafe',        name: 'Café',          icon: '☕', rentBonusPerFloor: 1.0,  incomeMultiplier: 0.05, ownIncome: 10,  ownIncomeFloorScale: 1.0, baseCost: 1000, costScale: 1.45, maxCount: 500, unlockFloors: 8 },
+    { id: 'cafe',        name: 'Café',          icon: '☕', rentBonusPerFloor: 1.0,  incomeMultiplier: 0.05, ownIncome: 10,  ownIncomeFloorScale: 1.0, baseCost: 1000, costScale: 1.45, maxCount: 1, unlockFloors: 8 },
     { id: 'fountain',    name: 'Fountain',      icon: '⛲', rentBonusPerFloor: 1.5,  incomeMultiplier: 0.04, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 600,  costScale: 1.38, maxCount: 500, unlockFloors: 6 },
     { id: 'playground',  name: 'Playground',    icon: '🎠', rentBonusPerFloor: 1.0,  incomeMultiplier: 0.03, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 400,  costScale: 1.35, maxCount: 500, unlockFloors: 4 },
   ],
@@ -57,8 +57,12 @@ const CONFIG = {
   cafeUpgrades: [
     { id: 'menu',      name: 'Better Menu',      icon: '📋', incomeBoost: 0.5, baseCost: 300,  costScale: 1.50, maxLevel: 20 },
     { id: 'seating',   name: 'More Seating',     icon: '💺', incomeBoost: 0.3, baseCost: 400,  costScale: 1.45, maxLevel: 20 },
-    { id: 'delivery',  name: 'Delivery Service', icon: '🛵', incomeBoost: 1.0, baseCost: 1500, costScale: 1.60, maxLevel: 10 },
-    { id: 'marketing', name: 'Marketing',        icon: '📢', incomeBoost: 0.8, baseCost: 800,  costScale: 1.55, maxLevel: 15 },
+    { id: 'barista',   name: 'Expert Barista',    icon: '👨‍🍳', incomeBoost: 0.6, baseCost: 600,  costScale: 1.50, maxLevel: 15 },
+    { id: 'pastries',  name: 'Fresh Pastries',    icon: '🥐', incomeBoost: 0.4, baseCost: 500,  costScale: 1.48, maxLevel: 20 },
+    { id: 'wifi',      name: 'Free WiFi',         icon: '📶', incomeBoost: 0.7, baseCost: 1000, costScale: 1.55, maxLevel: 10 },
+    { id: 'delivery',  name: 'Delivery Service',  icon: '🛵', incomeBoost: 1.0, baseCost: 1500, costScale: 1.60, maxLevel: 10 },
+    { id: 'marketing', name: 'Marketing',         icon: '📢', incomeBoost: 0.8, baseCost: 800,  costScale: 1.55, maxLevel: 15 },
+    { id: 'franchise', name: 'Franchise License',  icon: '🏪', incomeBoost: 2.0, baseCost: 5000, costScale: 1.70, maxLevel: 5 },
   ],
 
   // Visuals
@@ -115,6 +119,28 @@ interface CafeUpgradeState {
 
 const cafeUpgradeState: CafeUpgradeState[] = CONFIG.cafeUpgrades.map(u => ({ id: u.id, level: 0 }));
 
+interface CityEvent {
+  id: string;
+  name: string;
+  description: string;
+  fillRateMultiplier: number;
+  churnMultiplier: number;
+  rentMultiplier: number;
+  cafeMultiplier?: number;
+  costDiscount?: number;
+  duration: number;
+}
+
+const CITY_EVENTS: CityEvent[] = [
+  { id: 'perfect_weather', name: '☀️ Perfect Weather', description: 'Tenants love the area!', fillRateMultiplier: 2.0, churnMultiplier: 0.5, rentMultiplier: 1.0, duration: 180 },
+  { id: 'rainy_day', name: '🌧️ Rainy Day', description: 'Tenants staying cozy inside', fillRateMultiplier: 0.7, churnMultiplier: 0.2, rentMultiplier: 1.0, duration: 240 },
+  { id: 'magazine_feature', name: '📰 Featured in Magazine!', description: 'Rent prices soaring', fillRateMultiplier: 1.0, churnMultiplier: 1.0, rentMultiplier: 1.3, duration: 120 },
+  { id: 'street_festival', name: '🎪 Street Festival', description: 'Café income x5!', fillRateMultiplier: 1.5, churnMultiplier: 0.8, rentMultiplier: 1.0, cafeMultiplier: 5.0, duration: 120 },
+  { id: 'construction_surplus', name: '🏗️ Construction Surplus', description: 'Upgrades 30% cheaper!', fillRateMultiplier: 1.0, churnMultiplier: 1.0, rentMultiplier: 1.0, costDiscount: 0.3, duration: 180 },
+  { id: 'celebrity', name: '⭐ Celebrity Moves In!', description: 'Everyone wants to live here', fillRateMultiplier: 3.0, churnMultiplier: 0.3, rentMultiplier: 1.2, duration: 150 },
+  { id: 'heatwave', name: '🔥 Heat Wave', description: 'Tenants with AC stay, others leave', fillRateMultiplier: 0.8, churnMultiplier: 2.0, rentMultiplier: 1.0, duration: 120 },
+];
+
 interface GameState {
   money: number;
   floorCount: number;
@@ -122,6 +148,8 @@ interface GameState {
   adBoost: number;        // current fill rate bonus from ads
   adTimer: number;        // seconds remaining on boost
   adClicks: number;       // total clicks (for display)
+  activeEvent: { event: CityEvent; timeLeft: number } | null;
+  eventCooldown: number;  // seconds until next event
 }
 
 const BASE_RENT = CONFIG.baseRent;
@@ -151,7 +179,16 @@ const state: GameState = {
   adBoost: 0,
   adTimer: 0,
   adClicks: 0,
+  activeEvent: null,
+  eventCooldown: 120,
 };
+
+function getEventCostMultiplier(): number {
+  if (state.activeEvent && state.activeEvent.event.costDiscount) {
+    return 1 - state.activeEvent.event.costDiscount;
+  }
+  return 1;
+}
 
 const amenities: AmenityDef[] = CONFIG.amenities.map(a => ({ ...a, totalInstalled: 0 }));
 
@@ -163,9 +200,11 @@ function getTotalSlots(): number {
   return state.floorStates.reduce((sum, f) => sum + f.maxTenants, 0);
 }
 
-// Fill rate: base + temporary ad boost
+// Fill rate: base + temporary ad boost, multiplied by event
 function getFillRate(): number {
-  return CONFIG.baseFillRate + (state.adTimer > 0 ? state.adBoost : 0);
+  let rate = CONFIG.baseFillRate + (state.adTimer > 0 ? state.adBoost : 0);
+  if (state.activeEvent) rate *= state.activeEvent.event.fillRateMultiplier;
+  return rate;
 }
 
 // Tick ad boost decay
@@ -206,15 +245,10 @@ const HOOD_VISUALS: Record<string, { description: string; model: string | null; 
     { x: -2.5, y: 0, z: 0, ry: 0 }, { x: 2.5, y: 0, z: 0, ry: Math.PI },
     { x: -0.8, y: 0, z: -1.5, ry: 0.5 }, { x: 0.8, y: 0, z: -1.5, ry: -0.5 },
   ]},
-  parking: { description: 'Underground parking', model: 'car', positions: [
-    { x: -2, y: 0, z: 1.5, ry: 0 }, { x: 2, y: 0, z: 1.5, ry: 0 },
-    { x: -3.5, y: 0, z: 1.5, ry: 0 }, { x: 3.5, y: 0, z: 1.5, ry: 0 },
-    { x: -5, y: 0, z: 1.5, ry: 0 }, { x: 5, y: 0, z: 1.5, ry: 0 },
-    { x: -6.5, y: 0, z: 1.5, ry: 0 }, { x: 6.5, y: 0, z: 1.5, ry: 0 },
-    { x: -1, y: 0, z: 1.5, ry: 0 }, { x: 1, y: 0, z: 1.5, ry: 0 },
+  parking: { description: 'Underground parking', model: null, positions: [
   ]},
   cafe: { description: 'Earns income from tenants', model: 'models/building-type-h.glb', scaleOverride: 0.5, positions: [
-    { x: 3, y: 0, z: 0.3, ry: 0 }, { x: -3, y: 0, z: 0.3, ry: 0 }, { x: 5, y: 0, z: 0.3, ry: 0 },
+    { x: 2.8, y: 0, z: 0.3, ry: 0 },
   ]},
   fountain: { description: 'Beautiful centerpiece', model: null, positions: [
     { x: 0, y: 0, z: -1.8, ry: 0 }, { x: -2, y: 0, z: -2, ry: 0 }, { x: 2, y: 0, z: -2, ry: 0 },
@@ -274,7 +308,7 @@ function getCafeUpgradeMultiplier(): number {
 function getCafeUpgradeCost(index: number): number {
   const cfg = CONFIG.cafeUpgrades[index];
   const st = cafeUpgradeState[index];
-  return Math.floor(cfg.baseCost * Math.pow(cfg.costScale, st.level));
+  return Math.floor(cfg.baseCost * Math.pow(cfg.costScale, st.level) * getEventCostMultiplier());
 }
 
 function getNeighborhoodIncome(): number {
@@ -290,7 +324,7 @@ function getNeighborhoodIncome(): number {
 }
 
 function getNeighborhoodCost(n: NeighborhoodDef): number {
-  return Math.floor(n.baseCost * Math.pow(n.costScale, n.count));
+  return Math.floor(n.baseCost * Math.pow(n.costScale, n.count) * getEventCostMultiplier());
 }
 
 function getSpawnPosition(n: NeighborhoodDef): { x: number; y: number; z: number; ry: number } {
@@ -298,14 +332,16 @@ function getSpawnPosition(n: NeighborhoodDef): { x: number; y: number; z: number
   if (posIndex < n.positions.length) {
     return n.positions[posIndex];
   }
-  // Generate positions procedurally beyond predefined ones
-  const angle = (posIndex * 2.4) + n.id.length; // golden angle-ish spread
-  const radius = 2 + (posIndex - n.positions.length) * 0.3;
+  // Generate positions in concentric rings around building
+  const ring = Math.floor((posIndex - n.positions.length) / 8);
+  const slot = (posIndex - n.positions.length) % 8;
+  const angle = (slot / 8) * Math.PI * 2;
+  const radius = 1.5 + ring * 0.8;
   const x = Math.cos(angle) * radius;
-  const z = Math.sin(angle) * radius - 0.5;
+  let z = Math.sin(angle) * radius;
   // Keep off the street (z > 0.5 is street area)
-  const safeZ = z > 0.5 ? -(Math.abs(z)) : z;
-  return { x, y: 0, z: safeZ, ry: angle };
+  if (z > 0.3) z = -(Math.abs(z));
+  return { x, y: 0, z, ry: angle };
 }
 
 async function spawnNeighborhoodModel(n: NeighborhoodDef) {
@@ -326,17 +362,7 @@ async function spawnNeighborhoodModel(n: NeighborhoodDef) {
   const pos = getSpawnPosition(n);
 
   let obj: THREE.Object3D;
-  if (n.model === 'car') {
-    // Special case: spawn a parked car
-    const carColors = [0x3366cc, 0xcc3333, 0x33cc33, 0xffcc00, 0xffffff];
-    const color = carColors[Math.floor(Math.random() * carColors.length)];
-    const carMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(0.25, 0.12, 0.15),
-      new THREE.MeshLambertMaterial({ color })
-    );
-    carMesh.castShadow = true;
-    obj = carMesh;
-  } else if (n.model) {
+  if (n.model) {
     obj = await loadModel(n.model);
     if (n.scaleOverride) {
       obj.scale.setScalar(n.scaleOverride);
@@ -379,30 +405,38 @@ async function spawnNeighborhoodModel(n: NeighborhoodDef) {
     } else if (n.id === 'bench') {
       // Park bench
       const group = new THREE.Group();
+      // Seat
       const benchSeat = new THREE.Mesh(
-        new THREE.BoxGeometry(0.4, 0.03, 0.15),
+        new THREE.BoxGeometry(0.3, 0.03, 0.12),
         new THREE.MeshLambertMaterial({ color: 0x8B4513 })
       );
-      benchSeat.position.set(0, 0.18, 0);
+      benchSeat.position.set(0, 0.15, 0);
       benchSeat.castShadow = true;
       group.add(benchSeat);
+      // Back
       const backrest = new THREE.Mesh(
-        new THREE.BoxGeometry(0.4, 0.15, 0.02),
+        new THREE.BoxGeometry(0.3, 0.1, 0.02),
         new THREE.MeshLambertMaterial({ color: 0x8B4513 })
       );
-      backrest.position.set(0, 0.28, -0.065);
+      backrest.position.set(0, 0.22, -0.05);
       backrest.castShadow = true;
       group.add(backrest);
-      // Two legs
-      for (const lx of [-0.15, 0.15]) {
-        const leg = new THREE.Mesh(
-          new THREE.BoxGeometry(0.03, 0.18, 0.12),
-          new THREE.MeshLambertMaterial({ color: 0x555555 })
-        );
-        leg.position.set(lx, 0.09, 0);
-        leg.castShadow = true;
-        group.add(leg);
-      }
+      // Left leg
+      const leftLeg = new THREE.Mesh(
+        new THREE.BoxGeometry(0.02, 0.15, 0.12),
+        new THREE.MeshLambertMaterial({ color: 0x444444 })
+      );
+      leftLeg.position.set(-0.12, 0.075, 0);
+      leftLeg.castShadow = true;
+      group.add(leftLeg);
+      // Right leg
+      const rightLeg = new THREE.Mesh(
+        new THREE.BoxGeometry(0.02, 0.15, 0.12),
+        new THREE.MeshLambertMaterial({ color: 0x444444 })
+      );
+      rightLeg.position.set(0.12, 0.075, 0);
+      rightLeg.castShadow = true;
+      group.add(rightLeg);
       obj = group;
     } else {
       // Playground — swing set
@@ -479,7 +513,15 @@ function getTotalRentPerSecond(): number {
   // Apply global multiplier from neighborhood (compounds!)
   total *= getGlobalMultiplier();
   // Add neighborhood businesses income (already has café multiplier)
-  total += getNeighborhoodIncome();
+  let cafeIncome = getNeighborhoodIncome();
+  if (state.activeEvent && state.activeEvent.event.cafeMultiplier) {
+    cafeIncome *= state.activeEvent.event.cafeMultiplier;
+  }
+  total += cafeIncome;
+  // Apply event rent multiplier
+  if (state.activeEvent) {
+    total *= state.activeEvent.event.rentMultiplier;
+  }
   return total;
 }
 
@@ -509,12 +551,12 @@ function getAmenityCostPerUnit(a: AmenityDef, floorIndex: number): number {
   const studioMultiplier = floor ? Math.pow(5, floor.studioLevel) : 1;
   if (floorIndex === 0) {
     // Floor 0: use original cheap baseCosts so early game is playable
-    return Math.floor(a.baseCost * studioMultiplier);
+    return Math.floor(a.baseCost * studioMultiplier * getEventCostMultiplier());
   }
   // Floor 1+: costs scale as fraction of floor cost, always expensive
   const floorCost = Math.floor(CONFIG.floorBaseCost * Math.pow(CONFIG.floorCostScale, floorIndex));
   const ratio = AMENITY_FLOOR_COST_RATIO[a.id] || 0.3;
-  return Math.floor(floorCost * ratio * studioMultiplier);
+  return Math.floor(floorCost * ratio * studioMultiplier * getEventCostMultiplier());
 }
 
 // Total cost to install amenity on all remaining apartments on a floor
@@ -529,7 +571,7 @@ function getAmenityFullCost(a: AmenityDef, floorIndex: number): number {
 function getStudioCost(floorIndex: number, studioLevel: number): number {
   const floorCost = Math.floor(CONFIG.floorBaseCost * Math.pow(CONFIG.floorCostScale, Math.max(0, floorIndex)));
   const floorScaleFactor = (1 + floorIndex * 0.5);
-  return Math.floor(floorCost * 3 * floorScaleFactor * Math.pow(CONFIG.studioCostScale, studioLevel));
+  return Math.floor(floorCost * 3 * floorScaleFactor * Math.pow(CONFIG.studioCostScale, studioLevel) * getEventCostMultiplier());
 }
 
 let peakMoney = 0; // track highest money ever reached
@@ -543,7 +585,7 @@ function getAdCost(): number {
 let floorsPurchased = 0;
 
 function getFloorCost(): number {
-  return Math.floor(CONFIG.floorBaseCost * Math.pow(CONFIG.floorCostScale, floorsPurchased));
+  return Math.floor(CONFIG.floorBaseCost * Math.pow(CONFIG.floorCostScale, floorsPurchased) * getEventCostMultiplier());
 }
 
 // ── Phase Detection ─────────────────────────────────────────
@@ -784,33 +826,48 @@ interface TenantFigure {
   targetX: number;
   speed: number;
   arriving: boolean;
+  inCar: boolean;
 }
 
 const activeTenants: TenantFigure[] = [];
 const tenantMaterial = new THREE.MeshLambertMaterial({ color: 0x3366cc });
 const tenantGeometry = new THREE.CapsuleGeometry(0.04, 0.1, 4, 8);
+const carGeometry = new THREE.BoxGeometry(0.2, 0.1, 0.12);
+const carColors = [0x3366cc, 0xcc3333, 0x33cc33, 0xffcc00, 0xffffff, 0xff6600, 0x9933cc];
 
 function spawnTenant(arriving: boolean) {
   // Cap visible tenants at ~5
   if (activeTenants.length >= 5) return;
 
-  const mesh = new THREE.Mesh(tenantGeometry, tenantMaterial.clone());
+  const parkingCount = neighborhoodUpgrades.find(n => n.id === 'parking')?.count ?? 0;
+  const carChance = parkingCount > 0 ? Math.min(0.8, parkingCount * 0.1) : 0;
+  const inCar = arriving && Math.random() < carChance;
+
+  let mesh: THREE.Mesh;
+  if (inCar) {
+    const color = carColors[Math.floor(Math.random() * carColors.length)];
+    mesh = new THREE.Mesh(carGeometry, new THREE.MeshLambertMaterial({ color }));
+  } else {
+    mesh = new THREE.Mesh(tenantGeometry, tenantMaterial.clone());
+  }
+
   const startX = arriving ? (Math.random() > 0.5 ? 4 : -4) : 0;
   const endX = arriving ? 0 : (Math.random() > 0.5 ? 4 : -4);
   const z = 1.2 + (Math.random() - 0.5) * 0.6;
-  mesh.position.set(startX, 0.09, z);
+  mesh.position.set(startX, inCar ? 0.06 : 0.09, z);
   mesh.castShadow = true;
   scene.add(mesh);
 
-  if (!arriving) {
+  if (!arriving && !inCar) {
     (mesh.material as THREE.MeshLambertMaterial).color.setHex(0xcc3333);
   }
 
   activeTenants.push({
     mesh,
     targetX: endX,
-    speed: 0.4 + Math.random() * 0.3,
+    speed: inCar ? (1.0 + Math.random() * 0.5) : (0.4 + Math.random() * 0.3),
     arriving,
+    inCar,
   });
 }
 
@@ -898,7 +955,7 @@ function spawnMoneyPop(floorIndex: number) {
   if (floorIncome <= 0) return;
   const el = document.createElement('div');
   el.className = 'money-pop';
-  el.textContent = `+$${Math.floor(floorIncome)}`;
+  el.textContent = `+${formatMoney(floorIncome)}`;
   el.style.left = `${sx}px`;
   el.style.top = `${sy}px`;
   popsContainer.appendChild(el);
@@ -956,7 +1013,7 @@ function spawnCafePop(cafeIndex: number) {
 
   const el = document.createElement('div');
   el.className = 'money-pop cafe-pop';
-  el.textContent = `+$${perCafe}`;
+  el.textContent = `+${formatMoney(perCafe)}`;
   el.style.left = `${sx}px`;
   el.style.top = `${sy}px`;
   popsContainer.appendChild(el);
@@ -1172,10 +1229,16 @@ const occupancyPct = document.getElementById('occupancy-pct')!;
 const vacancyFill = document.getElementById('vacancy-fill')!;
 const shopEl = document.getElementById('shop')!;
 
-function formatMoney(n: number): string {
-  if (n >= 1_000_000) return '$' + (n / 1_000_000).toFixed(1) + 'M';
-  if (n >= 1_000) return '$' + (n / 1_000).toFixed(1) + 'K';
-  return '$' + Math.floor(n);
+function formatMoney(amount: number): string {
+  if (amount < 0) return '-' + formatMoney(-amount);
+  if (amount < 1000) return '$' + Math.floor(amount);
+  if (amount < 1e6) return '$' + (amount / 1e3).toFixed(1) + 'K';
+  if (amount < 1e9) return '$' + (amount / 1e6).toFixed(1) + 'M';
+  if (amount < 1e12) return '$' + (amount / 1e9).toFixed(1) + 'B';
+  if (amount < 1e15) return '$' + (amount / 1e12).toFixed(1) + 'T';
+  if (amount < 1e18) return '$' + (amount / 1e15).toFixed(1) + 'Qa';
+  if (amount < 1e21) return '$' + (amount / 1e18).toFixed(1) + 'Qi';
+  return '$' + amount.toExponential(1);
 }
 
 // Floor button only in the right panel
@@ -1399,7 +1462,7 @@ function renderNeighborhoodUI() {
       if (n.ownIncome > 0) {
         const incomePreview = n.ownIncome * (1 + state.floorCount * n.ownIncomeFloorScale) * getCafeUpgradeMultiplier();
         if (bonusText) bonusText += ' · ';
-        bonusText += `<span class="rent-val">earns $${Math.floor(incomePreview)}/s</span>`;
+        bonusText += `<span class="rent-val">earns ${formatMoney(incomePreview)}/s</span>`;
       }
       const key = `${n.id}:${n.count}:${formatMoney(cost)}:${state.floorCount}`;
       if (btn.dataset.key !== key) {
@@ -1472,25 +1535,38 @@ function renderUI() {
       floorBtn.innerHTML = `
         + New Floor
         <span class="cost">${formatMoney(floorCost)}</span>
-        <span class="desc">Floor #${state.floorCount + 1} · <span style="color:#7efa7e">+$${Math.floor(newFloorRent)}/s per tenant</span></span>
+        <span class="desc">Floor #${state.floorCount + 1} · <span style="color:#7efa7e">+${formatMoney(newFloorRent)}/s per tenant</span></span>
       `;
     }
   }
 
-  // Vacancy section + Hire Agents — hidden when tenants are full
+  // Vacancy section + Hire Agents — always visible, disabled when full
   {
     const totalTenants = getTotalTenants();
     const totalSlots = getTotalSlots();
-    const vacancySection = document.getElementById('vacancy-section')!;
-    if (totalTenants >= totalSlots) {
-      vacancySection.style.display = 'none';
+    const allOccupied = totalTenants >= totalSlots;
+    const adCost = getAdCost();
+    const canAffordAd = state.money >= adCost && !allOccupied;
+    adBtn.disabled = !canAffordAd;
+    if (allOccupied) {
+      adBtn.style.opacity = '0.4';
+      adBtn.style.pointerEvents = 'none';
     } else {
-      vacancySection.style.display = '';
-      const adCost = getAdCost();
-      const canAffordAd = state.money >= adCost;
-      adBtn.disabled = !canAffordAd;
-      const boostActive = state.adTimer > 0;
-      adBtn.className = boostActive ? 'shop-btn ad-btn ad-active' : 'shop-btn ad-btn';
+      adBtn.style.opacity = '';
+      adBtn.style.pointerEvents = '';
+    }
+    const boostActive = state.adTimer > 0;
+    adBtn.className = boostActive ? 'shop-btn ad-btn ad-active' : 'shop-btn ad-btn';
+    if (allOccupied) {
+      const adKey = `ad:all-occupied`;
+      if (adBtn.dataset.key !== adKey) {
+        adBtn.dataset.key = adKey;
+        adBtn.innerHTML = `
+          <span class="ad-title">🏠 HIRE AGENTS</span>
+          <span class="ad-stats"><span class="ad-boost">All units occupied</span></span>
+        `;
+      }
+    } else {
       const timerStr = boostActive ? `⏱ ${Math.ceil(state.adTimer)}s` : 'Inactive';
       const boostStr = boostActive ? `+${state.adBoost.toFixed(2)}/s` : '+0.00/s';
       const adKey = `ad:${state.adClicks}:${Math.ceil(state.adTimer)}:${canAffordAd}`;
@@ -1649,7 +1725,8 @@ function tickChurn(delta: number) {
     const churnChance = Math.max(0.001, CONFIG.baseChurnRate - amenityCount * CONFIG.amenityChurnReduction);
 
     // Scale to per-check-interval (churnRate is per minute, interval is in seconds)
-    const churnPerCheck = churnChance * (CONFIG.churnCheckInterval / 60);
+    let churnPerCheck = churnChance * (CONFIG.churnCheckInterval / 60);
+    if (state.activeEvent) churnPerCheck *= state.activeEvent.event.churnMultiplier;
 
     let lost = 0;
     for (let t = 0; t < floor.tenants; t++) {
@@ -1658,13 +1735,48 @@ function tickChurn(delta: number) {
       }
     }
     if (lost > 0) {
-      floor.tenants = Math.max(0, floor.tenants - lost);
+      floor.tenants = Math.max(3, floor.tenants - lost);
       // Spawn leaving figures (cap visual spawns)
       for (let j = 0; j < Math.min(lost, 3); j++) {
         spawnTenant(false);
       }
       markDirty();
     }
+  }
+}
+
+// ── City Events System ──────────────────────────────────────
+const eventBanner = document.getElementById('event-banner')!;
+
+function tickCityEvents(delta: number) {
+  if (state.activeEvent) {
+    state.activeEvent.timeLeft -= delta;
+    if (state.activeEvent.timeLeft <= 0) {
+      state.activeEvent = null;
+      state.eventCooldown = 120 + Math.random() * 180; // 120-300 seconds
+      eventBanner.classList.remove('active');
+    }
+  } else {
+    state.eventCooldown -= delta;
+    if (state.eventCooldown <= 0) {
+      const event = CITY_EVENTS[Math.floor(Math.random() * CITY_EVENTS.length)];
+      state.activeEvent = { event, timeLeft: event.duration };
+      eventBanner.classList.add('active');
+    }
+  }
+}
+
+function updateEventBannerUI() {
+  if (state.activeEvent) {
+    const e = state.activeEvent;
+    const mins = Math.floor(e.timeLeft / 60);
+    const secs = Math.floor(e.timeLeft % 60);
+    const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+    eventBanner.innerHTML = `
+      <div class="event-name">${e.event.name}</div>
+      <div>${e.event.description}</div>
+      <div class="event-timer">${timeStr} remaining</div>
+    `;
   }
 }
 
@@ -1697,6 +1809,9 @@ function gameLoop(time: number) {
   // ── Ad boost decay ──
   tickAdBoost(delta);
 
+  // ── City events ──
+  tickCityEvents(delta);
+
   // ── Tenant fill tick ──
   tickTenantFill(delta);
 
@@ -1721,6 +1836,7 @@ function gameLoop(time: number) {
     uiTimer = 0;
     renderUI();
     updateFloorPanelContent();
+    updateEventBannerUI();
   }
 
   // ── Camera animation ──

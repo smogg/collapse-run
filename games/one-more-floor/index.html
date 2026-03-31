@@ -499,6 +499,28 @@
       100% { transform: translate(-50%, -40px) scale(0.8); opacity: 0; }
     }
 
+    /* ── Event Banner ── */
+    #event-banner {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(20, 30, 50, 0.95);
+      border: 2px solid #ffd700;
+      border-radius: 12px;
+      padding: 8px 20px;
+      color: white;
+      font-size: 14px;
+      z-index: 1000;
+      text-align: center;
+      display: none;
+      animation: eventSlideIn 0.5s ease-out;
+    }
+    #event-banner.active { display: block; }
+    #event-banner .event-name { font-size: 16px; font-weight: bold; }
+    #event-banner .event-timer { color: #ffd700; font-size: 12px; }
+    @keyframes eventSlideIn { from { top: -50px; opacity: 0; } to { top: 10px; opacity: 1; } }
+
     /* ── Mobile ── */
     @media (max-width: 600px) {
       #stats {
@@ -559,6 +581,7 @@
 </head>
 <body>
   <canvas id="game-canvas"></canvas>
+  <div id="event-banner"></div>
   <div id="ui">
     <div id="money-pops"></div>
     <div id="floor-panels"></div>
