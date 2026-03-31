@@ -1,0 +1,18 @@
+{
+  "name": "one-more-floor",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@types/three": "^0.183.1",
+    "typescript": "^5.4.0",
+    "vite": "^8.0.3"
+  },
+  "dependencies": {
+    "three": "^0.172.0"
+  }
+}

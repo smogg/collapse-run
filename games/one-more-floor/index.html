@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>One More Floor</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { width: 100%; height: 100%; overflow: hidden; touch-action: none; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; }
+    #game-canvas { width: 100%; height: 100%; display: block; }
+
+    #ui {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+    }
+
+    /* ── Right panel: stats + new floor button ── */
+    #panel {
+      position: absolute;
+      right: 16px;
+      top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: auto;
+      width: 200px;
+      z-index: 20;
+    }
+
+    #stats {
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 14px 16px;
+      color: #fff;
+    }
+
+    #stats .money {
+      font-size: 28px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    #stats .income {
+      font-size: 14px;
+      color: #7efa7e;
+      margin-top: 2px;
+    }
+
+    #stats .info-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: #eee;
+      margin-top: 6px;
+    }
+
+    #stats .info-row .label { color: #aaa; }
+
+    #vacancy-bar {
+      width: 100%;
+      height: 6px;
+      background: #444;
+      border-radius: 3px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+
+    #vacancy-fill {
+      height: 100%;
+      background: #7efa7e;
+      border-radius: 3px;
+      transition: width 0.5s, background 0.5s;
+    }
+
+    #vacancy-label {
+      font-size: 12px;
+      color: #bbb;
+      margin-top: 3px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    #shop {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .shop-btn {
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.15s;
+      text-align: left;
+    }
+
+    .shop-btn:hover:not(:disabled) {
+      background: rgba(255,255,255,0.15);
+      transform: scale(1.02);
+    }
+
+    .shop-btn:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+
+    .shop-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      filter: grayscale(0.5);
+    }
+
+    .shop-btn .cost {
+      display: block;
+      font-size: 11px;
+      color: #ffd700;
+      margin-top: 2px;
+    }
+
+    .shop-btn .desc {
+      display: block;
+      font-size: 10px;
+      color: #aaa;
+      margin-top: 1px;
+    }
+
+    .floor-btn {
+      background: rgba(30, 120, 60, 0.85);
+      border-color: rgba(100, 220, 130, 0.5);
+      color: #fff;
+    }
+
+    .floor-btn:hover:not(:disabled) {
+      background: rgba(40, 150, 80, 0.9);
+    }
+
+    .floor-btn:disabled {
+      background: rgba(30, 60, 40, 0.6);
+      border-color: rgba(100, 220, 130, 0.15);
+      opacity: 0.6;
+    }
+
+    /* ── Floor upgrade panels (floating next to building) ── */
+    #floor-panels {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .floor-panel {
+      position: absolute;
+      top: 0; left: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      pointer-events: auto;
+      transition: opacity 0.2s;
+    }
+
+    .floor-rent-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #7efa7e;
+      background: rgba(0,0,0,0.6);
+      border-radius: 5px;
+      padding: 3px 7px;
+      white-space: nowrap;
+      text-align: center;
+      min-width: 44px;
+    }
+
+    .floor-rent-label.vacant {
+      color: #fa7e7e;
+    }
+
+    .floor-installed {
+      display: flex;
+      gap: 2px;
+      align-items: center;
+    }
+
+    .floor-installed-icon {
+      font-size: 11px;
+      opacity: 0.8;
+    }
+
+    .floor-complete {
+      font-size: 16px;
+      color: #ffd700;
+    }
+
+    .floor-buy-btn {
+      border-radius: 8px;
+      border: 1.5px solid rgba(255,255,255,0.15);
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      cursor: pointer;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .floor-buy-btn .btn-icon {
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .floor-buy-btn .btn-info {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      text-align: left;
+    }
+
+    .floor-buy-btn .btn-name {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .floor-buy-btn .btn-detail {
+      font-size: 10px;
+      color: #aaa;
+    }
+
+    .floor-buy-btn .btn-detail .cost-val {
+      color: #ffd700;
+      font-weight: 600;
+    }
+
+    .floor-buy-btn .btn-detail .rent-val {
+      color: #7efa7e;
+    }
+
+    .floor-buy-btn:hover:not(:disabled) {
+      background: rgba(0,0,0,0.8);
+      border-color: rgba(255,215,0,0.4);
+      transform: scale(1.03);
+    }
+
+    .floor-buy-btn:active:not(:disabled) {
+      transform: scale(0.96);
+    }
+
+    .floor-buy-btn.affordable {
+      border-color: rgba(255, 215, 0, 0.5);
+      animation: pulse 1.5s infinite;
+    }
+
+    .floor-buy-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.3); }
+      50% { box-shadow: 0 0 6px 2px rgba(255, 215, 0, 0.3); }
+    }
+
+    /* ── Money pops ── */
+    #money-pops {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 6;
+    }
+
+    .money-pop {
+      position: absolute;
+      font-size: 14px;
+      font-weight: 700;
+      color: #ffd700;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    /* ── Mobile ── */
+    @media (max-width: 600px) {
+      #panel {
+        right: 8px;
+        left: 8px;
+        top: auto;
+        bottom: 8px;
+        width: auto;
+      }
+      #stats {
+        padding: 10px 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 12px;
+        align-items: baseline;
+      }
+      #stats .money { font-size: 22px; }
+      #stats .income { margin-top: 0; }
+      #stats .info-row { margin-top: 0; }
+      #vacancy-bar { margin-top: 0; width: 50px; }
+      #vacancy-label { margin-top: 0; }
+
+      .floor-upgrade-btn {
+        width: 28px;
+        height: 28px;
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+  <div id="ui">
+    <div id="money-pops"></div>
+    <div id="floor-panels"></div>
+    <div id="panel">
+      <div id="stats">
+        <div class="money" id="money-display">$0</div>
+        <div class="income" id="income-display">$0/s</div>
+        <div class="info-row">
+          <span class="label">Floors</span>
+          <span id="floor-display">1</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Rent</span>
+          <span id="rent-display">$1 avg</span>
+        </div>
+        <div class="info-row" style="margin-top:8px">
+          <span class="label">Occupancy</span>
+        </div>
+        <div id="vacancy-bar"><div id="vacancy-fill" style="width:100%"></div></div>
+        <div id="vacancy-label">
+          <span id="occupancy-display">1/1</span>
+          <span id="occupancy-pct">100%</span>
+        </div>
+      </div>
+      <div id="shop"></div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
