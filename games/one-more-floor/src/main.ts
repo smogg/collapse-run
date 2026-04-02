@@ -384,6 +384,7 @@ function serializeState(cityName: string): SaveData {
     totalEvents: state.totalEvents,
     adClicks: state.adClicks,
     incomePerSecond: getTotalRentPerSecond(),
+    lastSaveTime: Date.now(),
   };
 }
 
@@ -1047,68 +1048,81 @@ function showAchievementPopup(a: Achievement) {
 }
 
 // ── Achievement Yard Signs ───────────────────────────────────
-interface AchievementSignLabel {
-  el: HTMLDivElement;
-  position: THREE.Vector3;
+const achievementSignPositions: { x: number; z: number }[] = [];
+
+function getRandomSignPosition(): { x: number; z: number } {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const x = (Math.random() - 0.5) * 8; // -4 to 4
+    const z = 2.2 + Math.random() * 1.5; // 2.2 to 3.7 (across the street, on far grass)
+    // Check minimum distance from existing signs
+    let tooClose = false;
+    for (const pos of achievementSignPositions) {
+      const dx = x - pos.x;
+      const dz = z - pos.z;
+      if (Math.sqrt(dx * dx + dz * dz) < 0.8) { tooClose = true; break; }
+    }
+    if (!tooClose) return { x, z };
+  }
+  // Fallback: just place it somewhere across the street
+  return { x: (Math.random() - 0.5) * 8, z: 2.2 + Math.random() * 1.5 };
 }
 
-const achievementSignLabels: AchievementSignLabel[] = [];
-let achievementSignCount = 0;
-
-function spawnAchievementSign(ach: typeof CONFIG.achievementSigns[0], showLabel: boolean = true) {
-  const idx = achievementSignCount++;
-  const x = -3 + idx * 0.6;
-  const z = 2.0;
+function spawnAchievementSign(ach: typeof CONFIG.achievementSigns[0], _showLabel: boolean = true) {
+  const pos = getRandomSignPosition();
+  achievementSignPositions.push(pos);
+  const ry = (Math.random() - 0.5) * 0.4; // slight random rotation
 
   // Vertical post
   const postGeo = new THREE.BoxGeometry(0.02, 0.35, 0.02);
   const postMat = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
   const post = new THREE.Mesh(postGeo, postMat);
-  post.position.set(x, 0.175, z);
+  post.position.set(pos.x, 0.175, pos.z);
+  post.rotation.y = ry;
   post.castShadow = true;
   scene.add(post);
 
-  // Sign panel on top
+  // Sign panel with icon texture
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const c2d = canvas.getContext('2d')!;
+  c2d.fillStyle = '#ffffff';
+  c2d.fillRect(0, 0, 128, 128);
+
+  const texture = new THREE.CanvasTexture(canvas);
   const panelGeo = new THREE.BoxGeometry(0.25, 0.15, 0.01);
-  const panelMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  const panelMat = new THREE.MeshBasicMaterial({ map: texture });
   const panel = new THREE.Mesh(panelGeo, panelMat);
-  panel.position.set(x, 0.425, z);
-  panel.rotation.y = Math.PI;
+  panel.position.set(pos.x, 0.425, pos.z);
+  panel.rotation.y = ry;
   panel.castShadow = true;
   scene.add(panel);
 
-  // CSS overlay label — only show for newly earned achievements
-  if (showLabel) {
-    const labelEl = document.createElement('div');
-    labelEl.className = 'achievement-sign-label';
-    labelEl.innerHTML = `<img src="${ach.icon}" style="width:16px;height:16px;vertical-align:middle;filter:invert(1)"> ${ach.name}`;
-    document.getElementById('floor-panels')!.appendChild(labelEl);
-
-    achievementSignLabels.push({
-      el: labelEl,
-      position: new THREE.Vector3(x, 0.425, z),
-    });
-  }
+  // Load SVG icon onto the canvas
+  const img = new Image();
+  const svgFetch = fetch(ach.icon).then(r => r.text()).then(svgText => {
+    // Recolor SVG to dark for white background
+    const colored = svgText.replace(/currentColor/g, '#333333').replace(/#fff/gi, '#333333');
+    const blob = new Blob([colored], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    img.onload = () => {
+      c2d.drawImage(img, 24, 24, 80, 80);
+      URL.revokeObjectURL(url);
+      texture.needsUpdate = true;
+      markDirty();
+    };
+    img.src = url;
+  }).catch(() => {
+    // Fallback: draw a star shape
+    c2d.fillStyle = '#ffd700';
+    c2d.font = '64px serif';
+    c2d.textAlign = 'center';
+    c2d.textBaseline = 'middle';
+    c2d.fillText('★', 64, 64);
+    texture.needsUpdate = true;
+  });
 
   markDirty();
-}
-
-function updateAchievementSignPositions() {
-  if (!_cameraMovedThisFrame && !needsRender) return;
-  for (const sign of achievementSignLabels) {
-    const projected = sign.position.clone().project(camera);
-    const hw = window.innerWidth / 2;
-    const hh = window.innerHeight / 2;
-    const sx = projected.x * hw + hw;
-    const sy = -(projected.y * hh) + hh;
-    if (projected.z > 0 && projected.z < 1) {
-      sign.el.style.left = `${sx}px`;
-      sign.el.style.top = `${sy}px`;
-      sign.el.style.opacity = '1';
-    } else {
-      sign.el.style.opacity = '0';
-    }
-  }
 }
 
 function showAchievementToast(ach: typeof CONFIG.achievementSigns[0]) {
@@ -3178,7 +3192,7 @@ function gameLoop(time: number) {
 
   // ── Floor panel positions (AFTER camera so projections are correct) ──
   updateFloorPanelPositions();
-  updateAchievementSignPositions();
+  // Achievement signs are now purely 3D — no CSS positioning needed
 
   // ── DOM content updates throttled ──
   uiTimer += visualDelta;
@@ -3506,6 +3520,19 @@ function showSettings() {
   startButtons.appendChild(backBtn);
 }
 
+function notifyCrazyGamesStart() {
+  try {
+    const cg = (window as any).CrazyGames;
+    if (cg?.SDK) cg.SDK.game?.gameplayStart();
+  } catch {}
+}
+function notifyCrazyGamesStop() {
+  try {
+    const cg = (window as any).CrazyGames;
+    if (cg?.SDK) cg.SDK.game?.gameplayStop();
+  } catch {}
+}
+
 async function startNewGame(existingSaves: SaveMeta[]) {
   const usedCities = existingSaves.map(s => s.cityName);
   currentCityName = getRandomCity(usedCities);
@@ -3513,6 +3540,7 @@ async function startNewGame(existingSaves: SaveMeta[]) {
   preloadSounds();
   await initGame();
   menuBtn.style.display = 'flex';
+  notifyCrazyGamesStart();
 }
 
 async function loadAndStart(cityName: string) {
@@ -3542,6 +3570,7 @@ async function loadAndStart(cityName: string) {
     // Rebuild building visually
     await rebuildBuildingFromState();
     menuBtn.style.display = 'flex';
+    notifyCrazyGamesStart();
     renderUI();
 
     // Offline progress — calculate earnings since last save
@@ -3614,8 +3643,8 @@ menuSettings.addEventListener('click', () => {
 
 menuQuit.addEventListener('click', async () => {
   await autoSave();
+  notifyCrazyGamesStop();
   gameMenu.classList.remove('active');
-  // Show start screen
   startScreen.classList.remove('hidden');
   showStartScreen();
 });

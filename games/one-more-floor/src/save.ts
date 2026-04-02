@@ -23,6 +23,7 @@ export interface SaveData {
   totalEvents: number;
   adClicks: number;
   incomePerSecond: number; // snapshot for offline progress calculation
+  lastSaveTime?: number;   // timestamp for offline progress
 }
 
 export interface SaveMeta {
