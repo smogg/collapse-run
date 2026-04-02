@@ -928,7 +928,7 @@ function spawnAchievementSign(ach: typeof CONFIG.achievementSigns[0]) {
 }
 
 function updateAchievementSignPositions() {
-  if (!_cameraMovedThisFrame && !needsRender) return;
+  if (!_cameraMovedThisFrame) return;
   for (const sign of achievementSignLabels) {
     const projected = sign.position.clone().project(camera);
     const hw = window.innerWidth / 2;
@@ -1108,7 +1108,7 @@ const RAIN_SKY = new THREE.Color(0x5a6a7a);
 const SUNNY_SKY = new THREE.Color(0x8ed4f5);
 const HEAT_SKY = new THREE.Color(0xd4956b);
 
-const rainCount = 800;
+const rainCount = 300;
 const rainGeo = new THREE.BufferGeometry();
 const rainPositions = new Float32Array(rainCount * 3);
 for (let i = 0; i < rainCount; i++) {
@@ -1123,7 +1123,7 @@ rainMesh.visible = false;
 scene.add(rainMesh);
 
 // ── Confetti (Street Festival) ──────────────────────────────
-const confettiCount = 500;
+const confettiCount = 200;
 const confettiGeo = new THREE.BufferGeometry();
 const confettiPositions = new Float32Array(confettiCount * 3);
 const confettiColors = new Float32Array(confettiCount * 3);
@@ -1787,14 +1787,21 @@ function tickMoneyPops(delta: number) {
   popTimer += delta;
   if (popTimer >= POP_INTERVAL) {
     popTimer = 0;
-    // Batch all pops — no setTimeout, use staggered startTime instead
-    let popCount = 0;
+    // Only pop from max 3 random floors per tick to limit DOM creation
+    const occupiedFloors: number[] = [];
     for (let i = 0; i < state.floorCount; i++) {
-      const floor = state.floorStates[i];
-      if (floor && floor.tenants > 0) {
-        spawnMoneyPopStaggered(i, popCount * 80);
-        popCount++;
-      }
+      if (state.floorStates[i] && state.floorStates[i].tenants > 0) occupiedFloors.push(i);
+    }
+    // Shuffle and take first 3
+    for (let i = occupiedFloors.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [occupiedFloors[i], occupiedFloors[j]] = [occupiedFloors[j], occupiedFloors[i]];
+    }
+    const popFloors = occupiedFloors.slice(0, 3);
+    let popCount = 0;
+    for (const fi of popFloors) {
+      spawnMoneyPopStaggered(fi, popCount * 80);
+      popCount++;
     }
     // Pop from first 3 cafés
     const cafeDef = neighborhoodUpgrades.find(n => n.id === 'cafe');
@@ -1925,7 +1932,17 @@ function ensureFloorPanels() {
 
 // Position-only update — runs every frame for smooth movement
 function updateFloorPanelPositions() {
-  if (!_cameraMovedThisFrame && !needsRender) return;
+  if (!_cameraMovedThisFrame) return;
+
+  // On mobile, hide floor panels — building is too small
+  const mobile = isMobile();
+  if (mobile) {
+    for (const panel of floorPanels) {
+      panel.el.style.opacity = '0';
+    }
+    return;
+  }
+
   for (let i = 0; i < floorPanels.length; i++) {
     const panel = floorPanels[i];
     const worldPos = new THREE.Vector3(-0.8, (i + 0.5) * actualFloorHeight, 0);
@@ -1937,7 +1954,7 @@ function updateFloorPanelPositions() {
     const sx = worldPos.x * hw + hw;
     const sy = -(worldPos.y * hh) + hh;
 
-    if (worldPos.z > 0 && worldPos.z < 1) {
+    if (worldPos.z > 0 && worldPos.z < 1 && sx > 50 && sx < window.innerWidth - 50 && sy > 10 && sy < window.innerHeight - 10) {
       panel.el.style.transform = `translate(-100%, -50%) translate(${sx}px, ${sy}px)`;
       panel.el.style.opacity = '1';
     } else {
@@ -2884,10 +2901,10 @@ function gameLoop(time: number) {
   // ── Churn tick ──
   tickChurn(cappedDelta);
 
-  // ── Tenants (only if active) ──
+  // ── Tenants (only if active, render throttled) ──
   if (activeTenants.length > 0) {
     updateTenants(visualDelta);
-    markDirty();
+    if (_currentFrame % 3 === 0) markDirty();
   }
 
   // ── Money pops (DOM, throttled with the pops themselves) ──
