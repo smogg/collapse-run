@@ -613,6 +613,39 @@
       color: #fff; z-index: 100; margin-bottom: 4px;
     }
     .achievement-badge:hover .achievement-tooltip { display: block; }
+
+    /* ── Achievement Yard Sign Labels ── */
+    .achievement-sign-label {
+      position: absolute;
+      pointer-events: none;
+      font-size: 9px;
+      color: #333;
+      background: rgba(255,255,255,0.9);
+      padding: 1px 4px;
+      border-radius: 3px;
+      white-space: nowrap;
+      text-align: center;
+      transform: translate(-50%, -100%);
+    }
+
+    /* ── Achievement Toast ── */
+    .achievement-toast {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(20, 30, 50, 0.95);
+      border: 2px solid #ffd700;
+      border-radius: 8px;
+      padding: 10px 20px;
+      color: white;
+      font-size: 14px;
+      z-index: 2000;
+      text-align: center;
+      animation: toastIn 0.3s ease-out, toastOut 0.5s ease-in 2.5s forwards;
+    }
+    @keyframes toastIn { from { bottom: 0; opacity: 0; } to { bottom: 80px; opacity: 1; } }
+    @keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
   </style>
 </head>
 <body>
