@@ -22,6 +22,7 @@ export interface SaveData {
   totalStudios: number;
   totalEvents: number;
   adClicks: number;
+  incomePerSecond: number; // snapshot for offline progress calculation
 }
 
 export interface SaveMeta {

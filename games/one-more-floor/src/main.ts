@@ -383,6 +383,7 @@ function serializeState(cityName: string): SaveData {
     totalStudios: state.totalStudios,
     totalEvents: state.totalEvents,
     adClicks: state.adClicks,
+    incomePerSecond: getTotalRentPerSecond(),
   };
 }
 
@@ -3061,29 +3062,52 @@ let _frameTime = 0;
 
 function invalidateUpgradeCache() { _bulkPhaseCached = null; }
 
-function showWelcomeBack(earned: number, seconds: number) {
-  const banner = document.createElement('div');
-  banner.style.cssText = `
-    position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
-    background:rgba(0,0,0,0.85); backdrop-filter:blur(10px);
-    color:#fff; padding:24px 36px; border-radius:16px; z-index:1000;
-    text-align:center; pointer-events:auto; cursor:pointer;
-    border:1px solid rgba(255,255,255,0.15);
-  `;
-  const mins = Math.floor(seconds / 60);
-  const timeText = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
-  banner.innerHTML = `
-    <div style="font-size:14px;color:#aaa;margin-bottom:8px">Welcome back! You were away ${timeText}</div>
-    <div style="font-size:32px;font-weight:bold;color:#7efa7e">+${formatMoney(earned)}</div>
-    <div style="font-size:12px;color:#888;margin-top:12px">Tap to continue</div>
-  `;
-  document.body.appendChild(banner);
-  banner.addEventListener('click', () => banner.remove());
-  setTimeout(() => banner.remove(), 8000);
+function showWelcomeBack(awaySeconds: number, earnings: number) {
+  const wb = document.getElementById('welcome-back')!;
+  const wbTime = document.getElementById('wb-time')!;
+  const wbAmount = document.getElementById('wb-amount')!;
+  const wbCollect = document.getElementById('wb-collect')!;
+
+  const hours = Math.floor(awaySeconds / 3600);
+  const minutes = Math.floor((awaySeconds % 3600) / 60);
+  if (hours > 0) {
+    wbTime.textContent = `${hours}h ${minutes}m`;
+  } else {
+    wbTime.textContent = `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+  }
+
+  wbAmount.textContent = formatMoney(earnings);
+  wb.style.display = 'flex';
+
+  wbCollect.onclick = () => {
+    state.money += earnings;
+    state.totalMoneyEarned += earnings;
+    wb.style.display = 'none';
+    playCashSound(0.8);
+    triggerGlow('green', 1500);
+    renderUI();
+  };
 }
+
+let tabHidden = false;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    tabHidden = true;
+  } else {
+    tabHidden = false;
+    lastTime = performance.now(); // prevent huge delta spike on return
+    markDirty();
+  }
+});
 
 function gameLoop(time: number) {
   requestAnimationFrame(gameLoop);
+
+  // Skip rendering when tab is hidden (massive CPU savings)
+  if (tabHidden) {
+    lastTime = time;
+    return;
+  }
 
   _currentFrame++;
   _cameraMovedThisFrame = false;
@@ -3519,10 +3543,29 @@ async function loadAndStart(cityName: string) {
     await rebuildBuildingFromState();
     menuBtn.style.display = 'flex';
     renderUI();
+
+    // Offline progress — calculate earnings since last save
+    const savedIncome = data.incomePerSecond ?? 0;
+    const savedTime = data.timestamp ?? 0;
+    if (savedIncome > 0 && savedTime > 0) {
+      const awaySeconds = Math.floor((Date.now() - savedTime) / 1000);
+      const MIN_AWAY = 60; // at least 1 minute to show
+      const MAX_AWAY = 8 * 3600; // cap at 8 hours of earnings
+      if (awaySeconds >= MIN_AWAY) {
+        const effectiveSeconds = Math.min(awaySeconds, MAX_AWAY);
+        // Give 50% of what they would have earned (standard idle game practice)
+        const offlineEarnings = savedIncome * effectiveSeconds * 0.5;
+        if (offlineEarnings > 0) {
+          showWelcomeBack(awaySeconds, offlineEarnings);
+        }
+      }
+    }
   } catch (e) {
     alert('Failed to load save: ' + e);
   }
 }
+
+
 
 let gameStarted = false;
 

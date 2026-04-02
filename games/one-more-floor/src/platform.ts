@@ -4,6 +4,8 @@ export interface GamePlatform {
   load(key: string): Promise<string | null>;
   listSaves(): Promise<string[]>;
   deleteSave(key: string): Promise<void>;
+  showRewardedAd(onReward: () => void, onMute: () => void, onUnmute: () => void): void;
+  hasAds(): boolean;
 }
 
 export class LocalStoragePlatform implements GamePlatform {
@@ -33,21 +35,38 @@ export class LocalStoragePlatform implements GamePlatform {
   async deleteSave(key: string): Promise<void> {
     localStorage.removeItem(this.prefix + key);
   }
+
+  showRewardedAd(_onReward: () => void, _onMute: () => void, _onUnmute: () => void): void {
+    // No ads in local dev — just give the reward
+    _onReward();
+  }
+
+  hasAds(): boolean { return false; }
 }
 
 export class CrazyGamesPlatform implements GamePlatform {
   private sdk: any = null;
 
   async init(): Promise<void> {
-    if ((window as any).CrazyGames?.SDK) {
-      this.sdk = (window as any).CrazyGames.SDK;
-      await this.sdk.init();
+    const cg = (window as any).CrazyGames;
+    if (cg?.SDK) {
+      this.sdk = cg.SDK;
+      try {
+        await this.sdk.init();
+      } catch {
+        // SDK init failed — fall back to localStorage
+        this.sdk = null;
+      }
     }
   }
 
   async save(key: string, data: string): Promise<void> {
     if (this.sdk?.data) {
-      await this.sdk.data.save({ [key]: data });
+      try {
+        this.sdk.data.setItem(key, data);
+      } catch {
+        localStorage.setItem('omf_save_' + key, data);
+      }
     } else {
       localStorage.setItem('omf_save_' + key, data);
     }
@@ -55,34 +74,88 @@ export class CrazyGamesPlatform implements GamePlatform {
 
   async load(key: string): Promise<string | null> {
     if (this.sdk?.data) {
-      const result = await this.sdk.data.load();
-      return result?.[key] ?? null;
+      try {
+        const val = this.sdk.data.getItem(key);
+        if (val != null) return val;
+        // Migration: check localStorage for old saves
+        const old = localStorage.getItem('omf_save_' + key);
+        if (old) {
+          // Migrate to SDK storage
+          this.sdk.data.setItem(key, old);
+          localStorage.removeItem('omf_save_' + key);
+          return old;
+        }
+        return null;
+      } catch {
+        return localStorage.getItem('omf_save_' + key);
+      }
     }
     return localStorage.getItem('omf_save_' + key);
   }
 
   async listSaves(): Promise<string[]> {
+    const saves = new Set<string>();
+
+    // Check SDK storage
     if (this.sdk?.data) {
-      const result = await this.sdk.data.load();
-      return result ? Object.keys(result) : [];
+      try {
+        // The SDK data module mirrors localStorage API
+        // We store a save index key to track all saves
+        const indexRaw = this.sdk.data.getItem('__save_index__');
+        if (indexRaw) {
+          const index = JSON.parse(indexRaw);
+          if (Array.isArray(index)) {
+            for (const s of index) saves.add(s);
+          }
+        }
+      } catch {}
     }
-    // Fallback to localStorage
-    const saves: string[] = [];
+
+    // Also check localStorage for migration
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
       if (k && k.startsWith('omf_save_')) {
-        saves.push(k.slice(9));
+        const name = k.slice(9);
+        if (name !== '__account__' && name !== '__save_index__') {
+          saves.add(name);
+        }
       }
     }
-    return saves;
+
+    return [...saves];
   }
 
   async deleteSave(key: string): Promise<void> {
     if (this.sdk?.data) {
-      await this.sdk.data.save({ [key]: null });
-    } else {
-      localStorage.removeItem('omf_save_' + key);
+      try {
+        this.sdk.data.removeItem(key);
+      } catch {}
     }
+    localStorage.removeItem('omf_save_' + key);
+  }
+
+  showRewardedAd(onReward: () => void, onMute: () => void, onUnmute: () => void): void {
+    if (!this.sdk?.ad) {
+      onReward(); // No SDK — just give reward
+      return;
+    }
+
+    this.sdk.ad.requestAd('rewarded', {
+      adStarted: () => {
+        onMute();
+      },
+      adError: () => {
+        onUnmute();
+      },
+      adFinished: () => {
+        onUnmute();
+        onReward();
+      },
+    });
+  }
+
+  hasAds(): boolean {
+    return !!(this.sdk?.ad);
   }
 }
 
