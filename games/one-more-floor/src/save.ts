@@ -63,6 +63,7 @@ export async function removeSaveFromIndex(platform: GamePlatform, cityName: stri
 
 export interface AccountData {
   earnedAchievements: string[];
+  citiesPlayed?: string[];
 }
 
 export async function loadAccountData(platform: GamePlatform): Promise<AccountData> {

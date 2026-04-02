@@ -30,7 +30,7 @@
       width: 220px;
       z-index: 20;
       overflow-y: auto;
-      overflow-x: hidden;
+      overflow-x: visible;
       scrollbar-width: thin;
       scrollbar-color: rgba(255,255,255,0.2) transparent;
     }
@@ -608,10 +608,10 @@
     }
     .achievement-badge.unlocked { opacity: 1; background: rgba(255,215,0,0.15); border-color: #ffd700; }
     .achievement-badge .achievement-tooltip {
-      display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+      display: none; position: fixed;
       background: rgba(0,0,0,0.9); border: 1px solid rgba(255,255,255,0.2);
       padding: 6px 10px; border-radius: 6px; white-space: nowrap; font-size: 11px;
-      color: #fff; z-index: 100; margin-bottom: 4px;
+      color: #fff; z-index: 2000; pointer-events: none;
     }
     .achievement-badge:hover .achievement-tooltip { display: block; }
 

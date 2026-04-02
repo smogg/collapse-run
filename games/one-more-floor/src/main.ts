@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { detectPlatform, type GamePlatform } from './platform';
-import { getRandomCity } from './cities';
+import { getRandomCity, getCityContinent, ALL_CONTINENTS } from './cities';
 import type { SaveData, SaveMeta } from './save';
 import { loadSaveIndex, updateSaveIndex, removeSaveFromIndex, loadAccountData, saveAccountData } from './save';
 import { playCashSound, playClickSound, playUpgradeSound, playNewFloorSound, playAchievementSound, playTenantSound, playStudioSound, playEventSound, playThunderSound, startRainAmbience, stopRainAmbience, setMuted, isMuted, preloadSounds } from './audio';
@@ -80,27 +80,27 @@ const CONFIG = {
   // Business sub-upgrades (per business type)
   businessUpgrades: {
     cafe: [
-      { id: 'menu', name: 'Better Menu', icon: '📋', incomeBoost: 1.0, baseCost: 300, costScale: 1.8, maxLevel: 20 },
-      { id: 'seating', name: 'More Seating', icon: '💺', incomeBoost: 0.8, baseCost: 500, costScale: 1.7, maxLevel: 20 },
-      { id: 'barista', name: 'Expert Barista', icon: '👨‍🍳', incomeBoost: 1.5, baseCost: 2000, costScale: 2.0, maxLevel: 15 },
-      { id: 'franchise', name: 'Franchise License', icon: '🏪', incomeBoost: 5.0, baseCost: 50000, costScale: 2.5, maxLevel: 5 },
+      { id: 'menu', name: 'Better Menu', icon: '📋', incomeBoost: 1.0, baseCost: 3000, costScale: 2.5, maxLevel: 20 },
+      { id: 'seating', name: 'More Seating', icon: '💺', incomeBoost: 0.8, baseCost: 5000, costScale: 2.4, maxLevel: 20 },
+      { id: 'barista', name: 'Expert Barista', icon: '👨‍🍳', incomeBoost: 1.5, baseCost: 20000, costScale: 2.8, maxLevel: 15 },
+      { id: 'franchise', name: 'Franchise License', icon: '🏪', incomeBoost: 5.0, baseCost: 500000, costScale: 3.5, maxLevel: 5 },
     ],
     restaurant: [
-      { id: 'chef', name: 'Head Chef', icon: '👨‍🍳', incomeBoost: 2.0, baseCost: 10000, costScale: 1.8, maxLevel: 15 },
-      { id: 'winelist', name: 'Wine Selection', icon: '🍷', incomeBoost: 1.5, baseCost: 8000, costScale: 1.7, maxLevel: 20 },
-      { id: 'michelin', name: 'Michelin Star', icon: '⭐', incomeBoost: 10.0, baseCost: 500000, costScale: 3.0, maxLevel: 3 },
-      { id: 'catering', name: 'Catering Service', icon: '🚐', incomeBoost: 3.0, baseCost: 100000, costScale: 2.0, maxLevel: 10 },
+      { id: 'chef', name: 'Head Chef', icon: '👨‍🍳', incomeBoost: 2.0, baseCost: 100000, costScale: 2.5, maxLevel: 15 },
+      { id: 'winelist', name: 'Wine Selection', icon: '🍷', incomeBoost: 1.5, baseCost: 80000, costScale: 2.4, maxLevel: 20 },
+      { id: 'michelin', name: 'Michelin Star', icon: '⭐', incomeBoost: 10.0, baseCost: 5000000, costScale: 4.0, maxLevel: 3 },
+      { id: 'catering', name: 'Catering Service', icon: '🚐', incomeBoost: 3.0, baseCost: 1000000, costScale: 2.8, maxLevel: 10 },
     ],
     salon: [
-      { id: 'stylist', name: 'Star Stylist', icon: '✂️', incomeBoost: 1.5, baseCost: 5000, costScale: 1.8, maxLevel: 15 },
-      { id: 'products', name: 'Premium Products', icon: '💅', incomeBoost: 1.0, baseCost: 3000, costScale: 1.7, maxLevel: 20 },
-      { id: 'vip', name: 'VIP Treatments', icon: '💎', incomeBoost: 4.0, baseCost: 50000, costScale: 2.2, maxLevel: 8 },
+      { id: 'stylist', name: 'Star Stylist', icon: '✂️', incomeBoost: 1.5, baseCost: 50000, costScale: 2.5, maxLevel: 15 },
+      { id: 'products', name: 'Premium Products', icon: '💅', incomeBoost: 1.0, baseCost: 30000, costScale: 2.4, maxLevel: 20 },
+      { id: 'vip', name: 'VIP Treatments', icon: '💎', incomeBoost: 4.0, baseCost: 500000, costScale: 3.0, maxLevel: 8 },
     ],
     spa: [
-      { id: 'massage', name: 'Massage Therapy', icon: '💆', incomeBoost: 2.0, baseCost: 50000, costScale: 1.8, maxLevel: 15 },
-      { id: 'sauna', name: 'Sauna Suite', icon: '🧖', incomeBoost: 2.5, baseCost: 80000, costScale: 1.9, maxLevel: 10 },
-      { id: 'retreat', name: 'Wellness Retreat', icon: '🌿', incomeBoost: 8.0, baseCost: 500000, costScale: 2.5, maxLevel: 5 },
-      { id: 'celebrity_spa', name: 'Celebrity Package', icon: '🌟', incomeBoost: 15.0, baseCost: 5000000, costScale: 3.0, maxLevel: 3 },
+      { id: 'massage', name: 'Massage Therapy', icon: '💆', incomeBoost: 2.0, baseCost: 500000, costScale: 2.5, maxLevel: 15 },
+      { id: 'sauna', name: 'Sauna Suite', icon: '🧖', incomeBoost: 2.5, baseCost: 800000, costScale: 2.8, maxLevel: 10 },
+      { id: 'retreat', name: 'Wellness Retreat', icon: '🌿', incomeBoost: 8.0, baseCost: 5000000, costScale: 3.5, maxLevel: 5 },
+      { id: 'celebrity_spa', name: 'Celebrity Package', icon: '🌟', incomeBoost: 15.0, baseCost: 50000000, costScale: 4.0, maxLevel: 3 },
     ],
   } as Record<string, { id: string; name: string; icon: string; incomeBoost: number; baseCost: number; costScale: number; maxLevel: number }[]>,
 
@@ -166,6 +166,23 @@ const CONFIG = {
     { id: 'full_house', name: 'No Vacancy', icon: 'icons/crowned-heart.svg', bonus: 1.10, trigger: 'occupancy_full' as const, value: 0 },
     { id: 'penthouse', name: 'Penthouse Suite', icon: 'icons/trophy.svg', bonus: 1.20, trigger: 'penthouses' as const, value: 0 },
     { id: 'five_penthouses', name: 'Luxury Empire', icon: 'icons/laurel-crown.svg', bonus: 1.25, trigger: 'penthouses_count' as const, value: 5 },
+
+    // City / Travel milestones
+    { id: 'first_city', name: 'First City', icon: 'icons/family-house.svg', bonus: 1.05, trigger: 'cities_played' as const, value: 1 },
+    { id: 'three_cities', name: 'Frequent Flyer', icon: 'icons/sprint.svg', bonus: 1.10, trigger: 'cities_played' as const, value: 3 },
+    { id: 'five_cities', name: 'Jet Setter', icon: 'icons/sprint.svg', bonus: 1.15, trigger: 'cities_played' as const, value: 5 },
+    { id: 'ten_cities', name: 'World Traveler', icon: 'icons/modern-city.svg', bonus: 1.20, trigger: 'cities_played' as const, value: 10 },
+    { id: 'twenty_cities', name: 'Globetrotter', icon: 'icons/modern-city.svg', bonus: 1.30, trigger: 'cities_played' as const, value: 20 },
+
+    // Continent milestones
+    { id: 'europe', name: 'European Tycoon', icon: 'icons/star-formation.svg', bonus: 1.15, trigger: 'continent' as const, value: 0, continent: 'Europe' },
+    { id: 'asia', name: 'Asian Empire', icon: 'icons/star-formation.svg', bonus: 1.15, trigger: 'continent' as const, value: 0, continent: 'Asia' },
+    { id: 'north_america', name: 'American Dream', icon: 'icons/star-formation.svg', bonus: 1.15, trigger: 'continent' as const, value: 0, continent: 'North America' },
+    { id: 'south_america', name: 'South American Mogul', icon: 'icons/star-formation.svg', bonus: 1.15, trigger: 'continent' as const, value: 0, continent: 'South America' },
+    { id: 'africa', name: 'African Pioneer', icon: 'icons/star-formation.svg', bonus: 1.15, trigger: 'continent' as const, value: 0, continent: 'Africa' },
+    { id: 'oceania', name: 'Pacific Islander', icon: 'icons/star-formation.svg', bonus: 1.15, trigger: 'continent' as const, value: 0, continent: 'Oceania' },
+    { id: 'all_continents', name: 'Global Domination', icon: 'icons/laurel-crown.svg', bonus: 2.00, trigger: 'all_continents' as const, value: 0 },
+
     { id: 'completionist', name: 'Completionist', icon: 'icons/medal.svg', bonus: 1.50, trigger: 'all_achievements' as const, value: 0 },
   ],
 
@@ -354,6 +371,7 @@ const state: GameState = {
 };
 
 let accountAchievements: Set<string> = new Set();
+let citiesPlayed: Set<string> = new Set();
 
 // ── Save/Load Serialization ──────────────────────────────────
 function serializeState(cityName: string): SaveData {
@@ -1052,22 +1070,23 @@ const achievementSignPositions: { x: number; z: number }[] = [];
 
 function getRandomSignPosition(): { x: number; z: number } {
   for (let attempt = 0; attempt < 50; attempt++) {
-    const x = (Math.random() - 0.5) * 8; // -4 to 4
-    const z = 2.2 + Math.random() * 1.5; // 2.2 to 3.7 (across the street, on far grass)
+    const x = (Math.random() - 0.5) * 3; // -1.5 to 1.5
+    const z = 2.3 + Math.random() * 0.8; // 2.3 to 3.1 (tight group across the street)
     // Check minimum distance from existing signs
     let tooClose = false;
     for (const pos of achievementSignPositions) {
       const dx = x - pos.x;
       const dz = z - pos.z;
-      if (Math.sqrt(dx * dx + dz * dz) < 0.8) { tooClose = true; break; }
+      if (Math.sqrt(dx * dx + dz * dz) < 0.45) { tooClose = true; break; }
     }
     if (!tooClose) return { x, z };
   }
-  // Fallback: just place it somewhere across the street
-  return { x: (Math.random() - 0.5) * 8, z: 2.2 + Math.random() * 1.5 };
+  // Fallback
+  return { x: (Math.random() - 0.5) * 3, z: 2.3 + Math.random() * 0.8 };
 }
 
 function spawnAchievementSign(ach: typeof CONFIG.achievementSigns[0], _showLabel: boolean = true) {
+  if (isMobile()) return; // skip 3D signs on mobile — sidebar is enough
   const pos = getRandomSignPosition();
   achievementSignPositions.push(pos);
   const ry = (Math.random() - 0.5) * 0.4; // slight random rotation
@@ -1106,7 +1125,7 @@ function spawnAchievementSign(ach: typeof CONFIG.achievementSigns[0], _showLabel
     const blob = new Blob([colored], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
     img.onload = () => {
-      c2d.drawImage(img, 24, 24, 80, 80);
+      c2d.drawImage(img, 16, 16, 96, 96);
       URL.revokeObjectURL(url);
       texture.needsUpdate = true;
       markDirty();
@@ -1146,6 +1165,17 @@ function checkSignAchievements() {
       case 'occupancy_full': earned = getTotalTenants() >= getTotalSlots() && getTotalSlots() > 0; break;
       case 'penthouses': earned = state.floorStates.some(f => f.isPenthouse); break;
       case 'penthouses_count': earned = state.floorStates.filter(f => f.isPenthouse).length >= ach.value; break;
+      case 'cities_played': earned = citiesPlayed.size >= ach.value; break;
+      case 'continent': {
+        const cont = (ach as any).continent as string;
+        earned = [...citiesPlayed].some(c => getCityContinent(c) === cont);
+        break;
+      }
+      case 'all_continents': {
+        const visitedContinents = new Set([...citiesPlayed].map(c => getCityContinent(c)));
+        earned = ALL_CONTINENTS.every(c => visitedContinents.has(c));
+        break;
+      }
       case 'all_achievements': earned = accountAchievements.size >= CONFIG.achievementSigns.length - 1; break;
     }
     if (earned) {
@@ -2731,7 +2761,17 @@ function renderAchievementsUI() {
       badge.className = 'achievement-badge';
       badge.id = `ach-${a.id}`;
       badge.innerHTML = `${a.icon}<div class="achievement-tooltip"><b>${a.name}</b><br>${a.desc}<br><span style="color:#7efa7e">${a.multiplier}x income</span></div>`;
+      badge.addEventListener('mouseenter', positionTooltip);
       achievementsListEl.appendChild(badge);
+    }
+    function positionTooltip(e: MouseEvent) {
+      const badge = e.currentTarget as HTMLElement;
+      const tip = badge.querySelector('.achievement-tooltip') as HTMLElement;
+      if (!tip) return;
+      const rect = badge.getBoundingClientRect();
+      tip.style.left = `${rect.left + rect.width / 2}px`;
+      tip.style.top = `${rect.top - 4}px`;
+      tip.style.transform = 'translate(-50%, -100%)';
     }
     // Render sign achievements with SVG icons
     for (const ach of CONFIG.achievementSigns) {
@@ -2742,6 +2782,7 @@ function renderAchievementsUI() {
       const earned = accountAchievements.has(ach.id);
       const imgFilter = earned ? 'filter:invert(1)' : 'filter:invert(1) brightness(0.5)';
       badge.innerHTML = `<img src="${ach.icon}" style="width:24px;height:24px;${imgFilter}"><div class="achievement-tooltip"><b>${ach.name}</b><br><span style="color:#7efa7e">+${bonusPct}% income</span></div>`;
+      badge.addEventListener('mouseenter', positionTooltip);
       if (earned) badge.classList.add('unlocked');
       achievementsListEl.appendChild(badge);
     }
@@ -3369,6 +3410,7 @@ async function showStartScreen() {
   // Load account-level achievements
   const accountData = await loadAccountData(platform);
   accountAchievements = new Set(accountData.earnedAchievements);
+  citiesPlayed = new Set(accountData.citiesPlayed ?? []);
   // Sync to achievements array
   for (const a of achievements) {
     a.unlocked = accountAchievements.has(a.id);
@@ -3541,6 +3583,9 @@ async function startNewGame(existingSaves: SaveMeta[]) {
   await initGame();
   menuBtn.style.display = 'flex';
   notifyCrazyGamesStart();
+  // Track city for achievements
+  citiesPlayed.add(currentCityName);
+  saveAccountData(platform, { earnedAchievements: [...accountAchievements], citiesPlayed: [...citiesPlayed] });
 }
 
 async function loadAndStart(cityName: string) {
@@ -3571,6 +3616,9 @@ async function loadAndStart(cityName: string) {
     await rebuildBuildingFromState();
     menuBtn.style.display = 'flex';
     notifyCrazyGamesStart();
+    // Track city for achievements
+    citiesPlayed.add(cityName);
+    saveAccountData(platform, { earnedAchievements: [...accountAchievements], citiesPlayed: [...citiesPlayed] });
     renderUI();
 
     // Offline progress — calculate earnings since last save
