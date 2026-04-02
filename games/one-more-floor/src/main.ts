@@ -65,6 +65,16 @@ const CONFIG = {
     { id: 'billboard',   name: 'Billboard',     icon: '📋', rentBonusPerFloor: 0,    incomeMultiplier: 0,    ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 300,  costScale: 2.0,  maxCount: 10,  unlockFloors: 2,  fillRateBonus: 0.03 },
     { id: 'busstop',     name: 'Bus Stop',      icon: '🚌', rentBonusPerFloor: 0.1,  incomeMultiplier: 0,    ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 2000, costScale: 2.5,  maxCount: 8,   unlockFloors: 3,  fillRateBonus: 0.06 },
     { id: 'metrostation',name: 'Metro Station', icon: '🚇', rentBonusPerFloor: 0.5,  incomeMultiplier: 0.02, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 25000,costScale: 3.0,  maxCount: 5,   unlockFloors: 5,  fillRateBonus: 0.12 },
+    // Late-game mega upgrades (unlock after floor 15+)
+    { id: 'heliport',    name: 'Heliport',        icon: '🚁', rentBonusPerFloor: 50,   incomeMultiplier: 0.10, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 1e15,  costScale: 5.0,  maxCount: 10,  unlockFloors: 15, fillRateBonus: 0.5 },
+    { id: 'private_airport', name: 'Private Airport', icon: '✈️', rentBonusPerFloor: 200, incomeMultiplier: 0.15, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 50e15, costScale: 8.0,  maxCount: 5,   unlockFloors: 18, fillRateBonus: 1.0 },
+    { id: 'yacht_club',  name: 'Yacht Club',      icon: '⛵', rentBonusPerFloor: 100,  incomeMultiplier: 0.12, ownIncome: 1e12, ownIncomeFloorScale: 50,  baseCost: 10e15, costScale: 6.0,  maxCount: 8,   unlockFloors: 16, fillRateBonus: 0.3 },
+    { id: 'golf_course', name: 'Golf Course',     icon: '⛳', rentBonusPerFloor: 80,   incomeMultiplier: 0.08, ownIncome: 5e11, ownIncomeFloorScale: 30,  baseCost: 5e15,  costScale: 5.0,  maxCount: 8,   unlockFloors: 14, fillRateBonus: 0.2 },
+    { id: 'shopping_mall', name: 'Shopping Mall',  icon: '🏬', rentBonusPerFloor: 300,  incomeMultiplier: 0.20, ownIncome: 5e12, ownIncomeFloorScale: 100, baseCost: 100e15, costScale: 8.0, maxCount: 5,   unlockFloors: 20, fillRateBonus: 2.0 },
+    { id: 'theme_park',  name: 'Theme Park',      icon: '🎢', rentBonusPerFloor: 500,  incomeMultiplier: 0.25, ownIncome: 10e12, ownIncomeFloorScale: 200, baseCost: 500e15, costScale: 10.0, maxCount: 3, unlockFloors: 22, fillRateBonus: 3.0 },
+    { id: 'space_elevator', name: 'Space Elevator', icon: '🛸', rentBonusPerFloor: 1000, incomeMultiplier: 0.50, ownIncome: 50e12, ownIncomeFloorScale: 500, baseCost: 10e18, costScale: 15.0, maxCount: 3, unlockFloors: 25, fillRateBonus: 5.0 },
+    { id: 'quantum_lab', name: 'Quantum Lab',     icon: '⚛️', rentBonusPerFloor: 2000, incomeMultiplier: 0.40, ownIncome: 100e12, ownIncomeFloorScale: 1000, baseCost: 50e18, costScale: 12.0, maxCount: 3, unlockFloors: 28, fillRateBonus: 8.0 },
+    { id: 'dyson_sphere', name: 'Dyson Sphere',   icon: '☀️', rentBonusPerFloor: 5000, incomeMultiplier: 1.00, ownIncome: 1e15, ownIncomeFloorScale: 5000, baseCost: 500e18, costScale: 20.0, maxCount: 1, unlockFloors: 30, fillRateBonus: 20.0 },
   ],
 
   // Business sub-upgrades (per business type)
@@ -118,19 +128,29 @@ const CONFIG = {
     { id: 'hundred_tenants', name: '100 Tenants', icon: 'icons/sprint.svg', bonus: 1.10, trigger: 'tenants' as const, value: 100 },
     { id: 'five_hundred_tenants', name: '500 Tenants', icon: 'icons/star-formation.svg', bonus: 1.15, trigger: 'tenants' as const, value: 500 },
     { id: 'thousand_tenants', name: '1000 Tenants', icon: 'icons/modern-city.svg', bonus: 1.20, trigger: 'tenants' as const, value: 1000 },
+    { id: 'five_k_tenants', name: '5000 Tenants', icon: 'icons/modern-city.svg', bonus: 1.25, trigger: 'tenants' as const, value: 5000 },
+    { id: 'ten_k_tenants', name: '10K Tenants', icon: 'icons/star-formation.svg', bonus: 1.30, trigger: 'tenants' as const, value: 10000 },
+    { id: 'fifty_k_tenants', name: '50K Tenants', icon: 'icons/star-formation.svg', bonus: 1.40, trigger: 'tenants' as const, value: 50000 },
+    { id: 'hundred_k_tenants', name: '100K Tenants', icon: 'icons/sprint.svg', bonus: 1.50, trigger: 'tenants' as const, value: 100000 },
 
     // Floor milestones
     { id: 'first_floor', name: 'First Floor', icon: 'icons/family-house.svg', bonus: 1.05, trigger: 'floors' as const, value: 2 },
     { id: 'five_floors', name: '5 Stories', icon: 'icons/upgrade.svg', bonus: 1.08, trigger: 'floors' as const, value: 5 },
     { id: 'ten_floors', name: '10 Stories', icon: 'icons/upgrade.svg', bonus: 1.10, trigger: 'floors' as const, value: 10 },
     { id: 'twenty_floors', name: 'Skyscraper', icon: 'icons/modern-city.svg', bonus: 1.15, trigger: 'floors' as const, value: 20 },
+    { id: 'thirty_floors', name: '30 Stories', icon: 'icons/modern-city.svg', bonus: 1.15, trigger: 'floors' as const, value: 30 },
     { id: 'fifty_floors', name: 'Mega Tower', icon: 'icons/modern-city.svg', bonus: 1.20, trigger: 'floors' as const, value: 50 },
+    { id: 'hundred_floors', name: 'Arcology', icon: 'icons/modern-city.svg', bonus: 1.30, trigger: 'floors' as const, value: 100 },
 
     // Money milestones
     { id: 'first_million', name: 'Millionaire', icon: 'icons/two-coins.svg', bonus: 1.10, trigger: 'money_earned' as const, value: 1e6 },
     { id: 'first_billion', name: 'Billionaire', icon: 'icons/money-stack.svg', bonus: 1.15, trigger: 'money_earned' as const, value: 1e9 },
     { id: 'first_trillion', name: 'Trillionaire', icon: 'icons/cash.svg', bonus: 1.20, trigger: 'money_earned' as const, value: 1e12 },
     { id: 'quadrillionaire', name: 'Quadrillionaire', icon: 'icons/gold-mine.svg', bonus: 1.25, trigger: 'money_earned' as const, value: 1e15 },
+    { id: 'quintillionaire', name: 'Quintillionaire', icon: 'icons/gold-mine.svg', bonus: 1.30, trigger: 'money_earned' as const, value: 1e18 },
+    { id: 'sextillionaire', name: 'Sextillionaire', icon: 'icons/cash.svg', bonus: 1.35, trigger: 'money_earned' as const, value: 1e21 },
+    { id: 'septillionaire', name: 'Septillionaire', icon: 'icons/money-stack.svg', bonus: 1.40, trigger: 'money_earned' as const, value: 1e24 },
+    { id: 'beyond_money', name: 'Beyond Money', icon: 'icons/laurel-crown.svg', bonus: 2.00, trigger: 'money_earned' as const, value: 1e30 },
 
     // Studio milestones
     { id: 'first_studio', name: 'Studio Upgrade', icon: 'icons/hammer-drop.svg', bonus: 1.08, trigger: 'studios' as const, value: 1 },
@@ -293,6 +313,11 @@ const PROP_MGMT_LEVELS = [
   { name: 'Real Estate Empire',    cost: 500e12, multiplier: 50,   icon: '🌆' },
   { name: 'Global Holdings Corp',  cost: 10e15,  multiplier: 200,  icon: '🌍' },
   { name: 'Galactic Properties',   cost: 500e15, multiplier: 1000, icon: '🚀' },
+  { name: 'Quantum Real Estate',   cost: 50e18,  multiplier: 5000, icon: '⚛️' },
+  { name: 'Dimensional Holdings',  cost: 5e21,   multiplier: 25000, icon: '🌌' },
+  { name: 'Multiverse Realty',     cost: 500e21, multiplier: 100000, icon: '🔮' },
+  { name: 'Omniscient Properties', cost: 50e24,  multiplier: 500000, icon: '👁️' },
+  { name: 'God-Tier Holdings',     cost: 5e27,   multiplier: 5000000, icon: '⚡' },
 ];
 
 let propMgmtLevel = 0; // 0 = not purchased, 1+ = current level
@@ -511,6 +536,15 @@ const HOOD_VISUALS: Record<string, { description: string; model: string | null; 
   billboard: { description: 'Attracts tenants', model: null, positions: [] },
   busstop: { description: 'Public transit access', model: null, positions: [] },
   metrostation: { description: 'Major transit hub', model: null, positions: [] },
+  heliport: { description: 'VIP helicopter access', model: null, positions: [] },
+  private_airport: { description: 'Private jet terminal', model: null, positions: [] },
+  yacht_club: { description: 'Luxury marina', model: null, positions: [] },
+  golf_course: { description: 'Championship greens', model: null, positions: [] },
+  shopping_mall: { description: 'Mega retail complex', model: null, positions: [] },
+  theme_park: { description: 'World-class entertainment', model: null, positions: [] },
+  space_elevator: { description: 'Orbital access point', model: null, positions: [] },
+  quantum_lab: { description: 'Reality-bending research', model: null, positions: [] },
+  dyson_sphere: { description: 'Harness a star', model: null, positions: [] },
 };
 
 // Build neighborhood upgrades by merging CONFIG balance with visuals
@@ -1153,6 +1187,12 @@ let bulkPhaseUnlocked = false; // once unlocked, stays unlocked forever
 function isInBulkPhase(): boolean {
   if (bulkPhaseUnlocked) return true;
   if (_bulkPhaseCached !== null) return _bulkPhaseCached;
+  // If we're PAST the cap, we already passed the gate (can't get here without it)
+  if (state.floorCount > PER_FLOOR_CAP) {
+    bulkPhaseUnlocked = true;
+    _bulkPhaseCached = true;
+    return true;
+  }
   if (state.floorCount >= PER_FLOOR_CAP && allFloorsFullyUpgraded()) {
     bulkPhaseUnlocked = true;
     _bulkPhaseCached = true;
@@ -1453,6 +1493,7 @@ function updateWeatherVisuals(eventId: string | null, delta: number) {
       }
     } else if (lightningTimer >= nextLightningIn) {
       lightningActive = 0.15; // 150ms flash
+      playThunderSound();
     }
     markDirty();
   }
@@ -3463,6 +3504,13 @@ async function loadAndStart(cityName: string) {
     preloadSounds();
     await initGame();
     deserializeState(data);
+    // Force recalculate bulk phase
+    bulkPhaseUnlocked = false;
+    invalidateUpgradeCache();
+    // If past floor 10, we're in bulk phase
+    if (state.floorCount > PER_FLOOR_CAP) {
+      bulkPhaseUnlocked = true;
+    }
     // Sync account achievements
     for (const a of achievements) {
       a.unlocked = accountAchievements.has(a.id);
