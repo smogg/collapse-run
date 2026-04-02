@@ -1,5 +1,11 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { detectPlatform, type GamePlatform } from './platform';
+import { getRandomCity } from './cities';
+import type { SaveData, SaveMeta } from './save';
+import { loadSaveIndex, updateSaveIndex, removeSaveFromIndex } from './save';
+
+let platform: GamePlatform;
 
 // ══════════════════════════════════════════════════════════════
 // GAME CONFIG — tweak all balance numbers here
@@ -301,6 +307,93 @@ const state: GameState = {
   totalStudios: 0,
   totalEvents: 0,
 };
+
+// ── Save/Load Serialization ──────────────────────────────────
+function serializeState(cityName: string): SaveData {
+  return {
+    version: 1,
+    cityName,
+    timestamp: Date.now(),
+    money: state.money,
+    totalMoneyEarned: state.totalMoneyEarned,
+    floorCount: state.floorCount,
+    floorStates: state.floorStates.map(f => ({
+      tenants: f.tenants,
+      maxTenants: f.maxTenants,
+      studioLevel: f.studioLevel,
+      isPenthouse: f.isPenthouse,
+      amenityInstalls: Object.fromEntries(f.amenityInstalls),
+      penthouseAmenityInstalls: Object.fromEntries(f.penthouseAmenityInstalls),
+    })),
+    neighborhoodCounts: Object.fromEntries(neighborhoodUpgrades.map(n => [n.id, n.count])),
+    businessUpgradeLevels: Object.fromEntries(
+      Object.entries(businessUpgradeState).map(([bizId, levels]) => [
+        bizId,
+        Object.fromEntries(levels.map(l => [l.id, l.level])),
+      ])
+    ),
+    earnedAchievements: [...state.earnedAchievements],
+    propMgmtLevel,
+    totalStudios: state.totalStudios,
+    totalEvents: state.totalEvents,
+    adClicks: state.adClicks,
+  };
+}
+
+function deserializeState(data: SaveData): void {
+  state.money = data.money;
+  state.totalMoneyEarned = data.totalMoneyEarned ?? 0;
+  state.floorCount = data.floorCount;
+  state.adBoost = 0;
+  state.adTimer = 0;
+  state.adClicks = data.adClicks ?? 0;
+  state.activeEvent = null;
+  state.eventCooldown = 120;
+  state.earnedAchievements = new Set(data.earnedAchievements ?? []);
+  state.totalStudios = data.totalStudios ?? 0;
+  state.totalEvents = data.totalEvents ?? 0;
+
+  // Restore floor states
+  state.floorStates = data.floorStates.map(f => ({
+    amenityInstalls: new Map(Object.entries(f.amenityInstalls).map(([k, v]) => [k, Number(v)])),
+    tenants: f.tenants,
+    maxTenants: f.maxTenants,
+    studioLevel: f.studioLevel,
+    hasPenthouse: f.isPenthouse,
+    isPenthouse: f.isPenthouse,
+    penthouseAmenityInstalls: new Map(Object.entries(f.penthouseAmenityInstalls || {}).map(([k, v]) => [k, Number(v)])),
+  }));
+
+  // Restore neighborhood counts
+  for (const n of neighborhoodUpgrades) {
+    n.count = data.neighborhoodCounts?.[n.id] ?? 0;
+  }
+
+  // Restore business upgrade levels
+  for (const [bizId, levels] of Object.entries(data.businessUpgradeLevels ?? {})) {
+    if (businessUpgradeState[bizId]) {
+      for (const st of businessUpgradeState[bizId]) {
+        st.level = (levels as Record<string, number>)[st.id] ?? 0;
+      }
+    }
+  }
+
+  // Restore amenity totalInstalled counts
+  for (const a of amenities) {
+    a.totalInstalled = 0;
+    for (const f of state.floorStates) {
+      a.totalInstalled += f.amenityInstalls.get(a.id) ?? 0;
+    }
+  }
+
+  propMgmtLevel = data.propMgmtLevel ?? 0;
+  peakMoney = state.money;
+
+  // Restore achievements
+  for (const a of achievements) {
+    a.unlocked = state.earnedAchievements.has(a.id);
+  }
+}
 
 function getEventCostMultiplier(): number {
   if (state.activeEvent && state.activeEvent.event.costDiscount) {
@@ -2115,6 +2208,7 @@ function updateFloorPanelContent() {
 }
 
 // ── UI ──────────────────────────────────────────────────────
+const cityNameDisplay = document.getElementById('city-name-display')!;
 const moneyDisplay = document.getElementById('money-display')!;
 const incomeDisplay = document.getElementById('income-display')!;
 const floorDisplay = document.getElementById('floor-display')!;
@@ -2541,6 +2635,7 @@ function renderUI() {
   const totalSlots = getTotalSlots();
   const fillRate = getFillRate();
 
+  cityNameDisplay.textContent = currentCityName;
   moneyDisplay.textContent = formatMoney(state.money);
   const mult = getGlobalMultiplier();
   incomeDisplay.textContent = formatMoney(income) + '/s' + (mult > 1.01 ? ` (×${mult.toFixed(2)})` : '');
@@ -2872,8 +2967,8 @@ function gameLoop(time: number) {
   const cappedDelta = Math.min(rawDelta, 14400); // cap at 4 hours
   const visualDelta = Math.min(rawDelta, 0.1); // clamp for animations only
 
-  // ── Welcome back notification for idle earnings ──
-  if (cappedDelta > 5) {
+  // ── Welcome back notification for idle earnings (skip first frame) ──
+  if (cappedDelta > 5 && _currentFrame > 1) {
     const idleEarnings = getTotalRentPerSecondCached() * cappedDelta;
     if (idleEarnings > 0) showWelcomeBack(idleEarnings, cappedDelta);
   }
@@ -2891,6 +2986,13 @@ function gameLoop(time: number) {
 
   // ── Ad boost decay ──
   tickAdBoost(cappedDelta);
+
+  // ── Auto-save ──
+  autoSaveTimer += cappedDelta;
+  if (autoSaveTimer >= 30) {
+    autoSaveTimer = 0;
+    autoSave();
+  }
 
   // ── City events ──
   tickCityEvents(cappedDelta);
@@ -2973,10 +3075,293 @@ window.addEventListener('resize', () => {
   renderUI();
 };
 
-async function init() {
-  await initBuilding();
-  renderUI();
-  requestAnimationFrame(gameLoop);
+// ── Auto-save ────────────────────────────────────────────────
+let currentCityName = '';
+let autoSaveTimer = 0;
+
+async function autoSave() {
+  if (!currentCityName) return;
+  const data = serializeState(currentCityName);
+  await platform.save(currentCityName, JSON.stringify(data));
+  await updateSaveIndex(platform, {
+    cityName: currentCityName,
+    floorCount: state.floorCount,
+    money: state.money,
+    timestamp: Date.now(),
+  });
 }
 
-init();
+window.addEventListener('beforeunload', () => { autoSave(); });
+
+// ── Static formatters for start screen ───────────────────────
+function formatMoneyStatic(amount: number): string {
+  if (amount < 1000) return '$' + Math.floor(amount);
+  if (amount < 1e6) return '$' + (amount / 1e3).toFixed(1) + 'K';
+  if (amount < 1e9) return '$' + (amount / 1e6).toFixed(1) + 'M';
+  if (amount < 1e12) return '$' + (amount / 1e9).toFixed(1) + 'B';
+  if (amount < 1e15) return '$' + (amount / 1e12).toFixed(1) + 'T';
+  return '$' + amount.toExponential(1);
+}
+
+function formatTimeAgo(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+// ── Rebuild Building From Saved State ────────────────────────
+async function rebuildBuildingFromState() {
+  // Clear existing building
+  while (buildingGroup.children.length > 0) {
+    buildingGroup.remove(buildingGroup.children[0]);
+  }
+
+  // Rebuild ground floor
+  const groundFloor = await loadModel('models/building-door.glb');
+  groundFloor.position.y = 0;
+  buildingGroup.add(groundFloor);
+
+  const box = new THREE.Box3().setFromObject(groundFloor);
+  const size = box.getSize(new THREE.Vector3());
+  actualFloorHeight = size.y;
+
+  // Add additional floors
+  const floorModels = [
+    'models/building-window.glb',
+    'models/building-windows.glb',
+    'models/building-window-balcony.glb',
+    'models/building-window-awnings.glb',
+    'models/building-window-sill.glb',
+  ];
+
+  for (let i = 1; i < state.floorCount; i++) {
+    const modelPath = floorModels[(i - 1) % floorModels.length];
+    const newFloor = await loadModel(modelPath);
+    newFloor.position.y = i * actualFloorHeight;
+    buildingGroup.add(newFloor);
+  }
+
+  // Add roof
+  roofModel = await loadModel('models/roof-flat-top.glb');
+  roofModel.position.y = state.floorCount * actualFloorHeight;
+  buildingGroup.add(roofModel);
+
+  visualFloorCount = state.floorCount;
+  floorsPurchased = state.floorCount - 1;
+
+  // Rebuild neighborhood models
+  // Show sidewalk if purchased
+  const sidewalkDef = neighborhoodUpgrades.find(n => n.id === 'sidewalk');
+  if (sidewalkDef && sidewalkDef.count > 0) {
+    sidewalk.visible = true;
+  }
+
+  for (const n of neighborhoodUpgrades) {
+    if (n.id === 'sidewalk') continue; // handled above
+    const savedCount = n.count;
+    for (let i = 0; i < savedCount; i++) {
+      n.count = i + 1;
+      // Only spawn visual if within position limit or every 5th
+      if (n.count <= n.positions.length || n.count % 5 === 0) {
+        await spawnNeighborhoodModel(n);
+      }
+    }
+    n.count = savedCount;
+  }
+
+  // Rebuild achievement signs
+  for (const ach of CONFIG.achievementSigns) {
+    if (state.earnedAchievements.has(ach.id)) {
+      spawnAchievementSign(ach);
+    }
+  }
+
+  // Convert penthouse floors to gold
+  for (let i = 0; i < state.floorStates.length; i++) {
+    if (state.floorStates[i].isPenthouse) {
+      convertFloorToGold(i);
+    }
+  }
+
+  updateCamera();
+  markDirty();
+}
+
+// ── Start Screen ─────────────────────────────────────────────
+const startScreen = document.getElementById('start-screen')!;
+const startButtons = document.getElementById('start-buttons')!;
+
+async function showStartScreen() {
+  platform = detectPlatform();
+  await platform.init();
+
+  const saves = await loadSaveIndex(platform);
+  startButtons.innerHTML = '';
+
+  if (saves.length > 0) {
+    // Sort by most recent
+    saves.sort((a, b) => b.timestamp - a.timestamp);
+    const latest = saves[0];
+
+    // Continue button
+    const continueBtn = document.createElement('button');
+    continueBtn.className = 'start-btn primary';
+    continueBtn.innerHTML = `
+      <span class="btn-label">▶ Continue — ${latest.cityName}</span>
+      <span class="btn-detail">${latest.floorCount} floors · ${formatMoneyStatic(latest.money)}</span>
+    `;
+    continueBtn.onclick = () => loadAndStart(latest.cityName);
+    startButtons.appendChild(continueBtn);
+
+    // Load game button (shows list)
+    if (saves.length > 1) {
+      const loadBtn = document.createElement('button');
+      loadBtn.className = 'start-btn secondary';
+      loadBtn.innerHTML = '<span class="btn-label">Load Game</span>';
+      loadBtn.onclick = () => showSaveList(saves);
+      startButtons.appendChild(loadBtn);
+    }
+  }
+
+  // New game button
+  const newBtn = document.createElement('button');
+  newBtn.className = 'start-btn secondary';
+  newBtn.innerHTML = '<span class="btn-label">New Game</span>';
+  newBtn.onclick = () => startNewGame(saves);
+  startButtons.appendChild(newBtn);
+
+  // Settings button
+  const settingsBtn = document.createElement('button');
+  settingsBtn.className = 'start-btn secondary';
+  settingsBtn.innerHTML = '<span class="btn-label">Settings</span>';
+  settingsBtn.onclick = () => showSettings();
+  startButtons.appendChild(settingsBtn);
+}
+
+function showSaveList(saves: SaveMeta[]) {
+  startButtons.innerHTML = '';
+
+  const title = document.createElement('h3');
+  title.style.cssText = 'color: white; margin-bottom: 12px;';
+  title.textContent = 'Load Game';
+  startButtons.appendChild(title);
+
+  const list = document.createElement('div');
+  list.className = 'save-list';
+
+  for (const save of saves) {
+    const entry = document.createElement('div');
+    entry.className = 'save-entry';
+
+    const info = document.createElement('div');
+    info.innerHTML = `
+      <div class="save-city">${save.cityName}</div>
+      <div class="save-info">${save.floorCount} floors · ${formatMoneyStatic(save.money)} · ${formatTimeAgo(save.timestamp)}</div>
+    `;
+    info.style.cursor = 'pointer';
+    info.style.flex = '1';
+    info.onclick = () => loadAndStart(save.cityName);
+    entry.appendChild(info);
+
+    const del = document.createElement('button');
+    del.className = 'save-delete';
+    del.textContent = '\u2715';
+    del.onclick = async (e) => {
+      e.stopPropagation();
+      if (confirm(`Delete save "${save.cityName}"?`)) {
+        await platform.deleteSave(save.cityName);
+        await removeSaveFromIndex(platform, save.cityName);
+        const updatedSaves = await loadSaveIndex(platform);
+        if (updatedSaves.length > 0) {
+          showSaveList(updatedSaves);
+        } else {
+          showStartScreen();
+        }
+      }
+    };
+    entry.appendChild(del);
+
+    list.appendChild(entry);
+  }
+
+  startButtons.appendChild(list);
+
+  const backBtn = document.createElement('button');
+  backBtn.className = 'back-btn';
+  backBtn.textContent = '\u2190 Back';
+  backBtn.onclick = () => showStartScreen();
+  startButtons.appendChild(backBtn);
+}
+
+function showSettings() {
+  startButtons.innerHTML = '';
+
+  const title = document.createElement('h3');
+  title.style.cssText = 'color: white; margin-bottom: 12px;';
+  title.textContent = 'Settings';
+  startButtons.appendChild(title);
+
+  const panel = document.createElement('div');
+  panel.className = 'settings-panel';
+  panel.innerHTML = '<p>Audio and graphics settings coming soon.</p>';
+  startButtons.appendChild(panel);
+
+  const backBtn = document.createElement('button');
+  backBtn.className = 'back-btn';
+  backBtn.textContent = '\u2190 Back';
+  backBtn.onclick = () => showStartScreen();
+  startButtons.appendChild(backBtn);
+}
+
+async function startNewGame(existingSaves: SaveMeta[]) {
+  const usedCities = existingSaves.map(s => s.cityName);
+  currentCityName = getRandomCity(usedCities);
+  startScreen.classList.add('hidden');
+  await initGame();
+}
+
+async function loadAndStart(cityName: string) {
+  const raw = await platform.load(cityName);
+  if (!raw) {
+    alert('Save not found!');
+    return;
+  }
+  try {
+    const data: SaveData = JSON.parse(raw);
+    currentCityName = cityName;
+    startScreen.classList.add('hidden');
+    await initGame();
+    deserializeState(data);
+    // Rebuild building visually
+    await rebuildBuildingFromState();
+    renderUI();
+  } catch (e) {
+    alert('Failed to load save: ' + e);
+  }
+}
+
+let gameStarted = false;
+
+async function initGame() {
+  if (!gameStarted) {
+    gameStarted = true;
+    lastTime = performance.now();
+    _currentFrame = 0;
+    await initBuilding();
+    renderUI();
+    requestAnimationFrame(gameLoop);
+  } else {
+    // Game already running, just update UI
+    updateCamera();
+    renderUI();
+    markDirty();
+  }
+}
+
+// Show start screen immediately
+showStartScreen();

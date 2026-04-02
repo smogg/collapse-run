@@ -646,17 +646,177 @@
     }
     @keyframes toastIn { from { bottom: 0; opacity: 0; } to { bottom: 80px; opacity: 1; } }
     @keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
+
+    /* ── Start Screen ── */
+    #start-screen {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+
+    #start-screen.hidden {
+      display: none;
+    }
+
+    .start-content {
+      text-align: center;
+      color: white;
+      max-width: 400px;
+      width: 90%;
+    }
+
+    .game-title {
+      font-size: 48px;
+      font-weight: 900;
+      margin-bottom: 4px;
+      background: linear-gradient(135deg, #ffd700, #ffaa00);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: none;
+    }
+
+    .game-subtitle {
+      font-size: 16px;
+      color: #8899aa;
+      margin-bottom: 32px;
+    }
+
+    #start-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .start-btn {
+      padding: 14px 24px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      text-align: left;
+    }
+
+    .start-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+
+    .start-btn.primary {
+      background: linear-gradient(135deg, #4ade80, #22c55e);
+      color: #111;
+    }
+
+    .start-btn.secondary {
+      background: rgba(255,255,255,0.1);
+      color: #ddd;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+
+    .start-btn .btn-label {
+      display: block;
+      font-size: 16px;
+    }
+
+    .start-btn .btn-detail {
+      display: block;
+      font-size: 12px;
+      opacity: 0.7;
+      margin-top: 2px;
+    }
+
+    .save-list {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 250px;
+      overflow-y: auto;
+    }
+
+    .save-entry {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .save-entry:hover {
+      background: rgba(255,255,255,0.12);
+    }
+
+    .save-entry .save-city {
+      font-weight: 700;
+      font-size: 15px;
+    }
+
+    .save-entry .save-info {
+      font-size: 12px;
+      color: #8899aa;
+    }
+
+    .save-entry .save-delete {
+      background: none;
+      border: none;
+      color: #ff6666;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    .save-entry .save-delete:hover {
+      background: rgba(255,0,0,0.15);
+    }
+
+    .settings-panel {
+      color: #aaa;
+      text-align: center;
+      padding: 20px 0;
+    }
+
+    .back-btn {
+      margin-top: 16px;
+      padding: 8px 20px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #ddd;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
   <canvas id="game-canvas"></canvas>
   <div id="screen-glow"></div>
   <div id="event-banner"></div>
+  <div id="start-screen">
+    <div class="start-content">
+      <h1 class="game-title">One More Floor</h1>
+      <p class="game-subtitle">Build your real estate empire</p>
+      <div id="start-buttons">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </div>
   <div id="ui">
     <div id="money-pops"></div>
     <div id="floor-panels"></div>
     <div id="panel">
       <div id="stats">
+        <div id="city-name-display" style="font-size:11px;color:#8899aa;margin-bottom:4px"></div>
         <div class="money" id="money-display">$0</div>
         <div class="income" id="income-display">$0/s</div>
         <div class="info-row">
