@@ -577,10 +577,47 @@
       .floor-buy-btn .btn-icon { font-size: 13px; }
       .floor-rent-label { font-size: 9px; padding: 2px 5px; }
     }
+    #screen-glow {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      z-index: 999;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    #screen-glow.gold { background: radial-gradient(ellipse at center, rgba(255,215,0,0.3) 0%, transparent 70%); }
+    #screen-glow.green { background: radial-gradient(ellipse at center, rgba(100,255,100,0.3) 0%, transparent 70%); }
+    #screen-glow.purple { background: radial-gradient(ellipse at center, rgba(180,100,255,0.3) 0%, transparent 70%); }
+    #screen-glow.red { background: radial-gradient(ellipse at center, rgba(255,80,80,0.25) 0%, transparent 70%); }
+    #screen-glow.active { opacity: 1; }
+
+    @keyframes achievePop {
+      0% { transform: translate(-50%,-50%) scale(0.5); opacity: 0; }
+      50% { transform: translate(-50%,-50%) scale(1.1); }
+      100% { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+    }
+
+    #achievements-section { margin-top: 12px; }
+    #achievements-list { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; }
+    .achievement-badge {
+      width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+      font-size: 18px; border-radius: 6px; background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1); opacity: 0.3;
+      position: relative;
+    }
+    .achievement-badge.unlocked { opacity: 1; background: rgba(255,215,0,0.15); border-color: #ffd700; }
+    .achievement-badge .achievement-tooltip {
+      display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.9); border: 1px solid rgba(255,255,255,0.2);
+      padding: 6px 10px; border-radius: 6px; white-space: nowrap; font-size: 11px;
+      color: #fff; z-index: 100; margin-bottom: 4px;
+    }
+    .achievement-badge:hover .achievement-tooltip { display: block; }
   </style>
 </head>
 <body>
   <canvas id="game-canvas"></canvas>
+  <div id="screen-glow"></div>
   <div id="event-banner"></div>
   <div id="ui">
     <div id="money-pops"></div>
@@ -619,9 +656,10 @@
         <div class="section-header">Neighborhood</div>
         <div id="neighborhood-upgrades"></div>
       </div>
-      <div id="cafe-section" style="display:none">
-        <div class="section-header">Café Upgrades</div>
-        <div id="cafe-upgrades"></div>
+      <div id="business-sections"></div>
+      <div id="achievements-section">
+        <div class="section-header">Achievements</div>
+        <div id="achievements-list"></div>
       </div>
     </div>
   </div>
