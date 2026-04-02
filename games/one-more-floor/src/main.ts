@@ -1956,11 +1956,12 @@ function updateMoneyPops() {
       continue;
     }
     if (t < 0) continue; // delayed, not started yet
-    const dist = t * 60;
-    const xOffset = Math.cos(pop.angle) * dist;
-    const yOffset = Math.sin(pop.angle) * dist;
-    pop.el.style.transform = `translate(-50%, -50%) translate(${xOffset}px, ${yOffset}px) scale(${1 - t * 0.3})`;
-    pop.el.style.opacity = String(1 - t * t);
+    const dist = t * 80;
+    const x = pop.sx + Math.cos(pop.angle) * dist;
+    const y = pop.sy + Math.sin(pop.angle) * dist;
+    pop.el.style.left = `${x}px`;
+    pop.el.style.top = `${y}px`;
+    pop.el.style.opacity = String(Math.max(0, 1 - t * 1.2));
   }
 }
 
