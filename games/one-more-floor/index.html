@@ -434,6 +434,7 @@
       position: absolute;
       font-size: 14px;
       font-weight: 700;
+      animation: moneyFloat 1.4s ease-out forwards;
       color: #ffd700;
       text-shadow: 0 1px 3px rgba(0,0,0,0.5);
       pointer-events: none;
@@ -441,6 +442,11 @@
     }
 
     .money-pop.cafe-pop { color: #7efa7e; }
+
+    @keyframes moneyFloat {
+      0% { opacity: 1; transform: translate(-50%, -50%) translate(0, 0) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -50%) translate(var(--dx, 40px), var(--dy, -30px)) scale(0.7); }
+    }
 
     /* ── Ad boost button ── */
     .ad-btn {

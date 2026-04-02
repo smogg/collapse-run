@@ -1845,15 +1845,6 @@ function animateCamera() {
 // ── Floating Dollar Pops ────────────────────────────────────
 const popsContainer = document.getElementById('money-pops')!;
 
-interface MoneyPop {
-  el: HTMLDivElement;
-  startTime: number;
-  sx: number;
-  sy: number;
-  angle: number; // radians, direction of travel
-}
-
-const activePops: MoneyPop[] = [];
 const POP_DURATION = CONFIG.moneyPopDuration;
 
 function spawnMoneyPop(floorIndex: number) {
@@ -1881,12 +1872,13 @@ function spawnMoneyPop(floorIndex: number) {
   el.textContent = `+${formatMoney(floorIncome)}`;
   el.style.left = `${sx}px`;
   el.style.top = `${sy}px`;
-  popsContainer.appendChild(el);
-
-  // Fly to the RIGHT and slightly upward (10° to 50° upward-right)
   const angle = (-10 - Math.random() * 40) * (Math.PI / 180);
-
-  activePops.push({ el, startTime: _frameTime, sx, sy, angle });
+  const dx = Math.cos(angle) * 60;
+  const dy = Math.sin(angle) * 60;
+  el.style.setProperty('--dx', `${dx}px`);
+  el.style.setProperty('--dy', `${dy}px`);
+  popsContainer.appendChild(el);
+  setTimeout(() => el.remove(), POP_DURATION + 100);
 }
 
 function spawnMoneyPopStaggered(floorIndex: number, delayMs: number) {
@@ -1912,10 +1904,16 @@ function spawnMoneyPopStaggered(floorIndex: number, delayMs: number) {
   el.textContent = `+${formatMoney(floorIncome)}`;
   el.style.left = `${sx}px`;
   el.style.top = `${sy}px`;
-  popsContainer.appendChild(el);
-
+  // Set CSS custom properties for animation direction
   const angle = (-10 - Math.random() * 40) * (Math.PI / 180);
-  activePops.push({ el, startTime: _frameTime + delayMs, sx, sy, angle });
+  const dx = Math.cos(angle) * 60;
+  const dy = Math.sin(angle) * 60;
+  el.style.setProperty('--dx', `${dx}px`);
+  el.style.setProperty('--dy', `${dy}px`);
+  el.style.animationDelay = `${delayMs}ms`;
+  popsContainer.appendChild(el);
+  // Auto-remove after animation completes (no per-frame JS needed)
+  setTimeout(() => el.remove(), POP_DURATION + delayMs + 100);
 }
 
 function spawnCafePopStaggered(cafeIndex: number, delayMs: number) {
@@ -1943,32 +1941,19 @@ function spawnCafePopStaggered(cafeIndex: number, delayMs: number) {
   el.textContent = `+${formatMoney(perCafe)}`;
   el.style.left = `${sx}px`;
   el.style.top = `${sy}px`;
-  popsContainer.appendChild(el);
-
   const angle = (-10 - Math.random() * 40) * (Math.PI / 180);
-  activePops.push({ el, startTime: _frameTime + delayMs, sx, sy, angle });
+  const dx = Math.cos(angle) * 60;
+  const dy = Math.sin(angle) * 60;
+  el.style.setProperty('--dx', `${dx}px`);
+  el.style.setProperty('--dy', `${dy}px`);
+  el.style.animationDelay = `${delayMs}ms`;
+  popsContainer.appendChild(el);
+  setTimeout(() => el.remove(), POP_DURATION + delayMs + 100);
 }
 
+// Money pops are now CSS-animated — no per-frame JS update needed
 function updateMoneyPops() {
-  const now = _frameTime;
-  for (let i = activePops.length - 1; i >= 0; i--) {
-    const pop = activePops[i];
-    const elapsed = now - pop.startTime;
-    const t = elapsed / POP_DURATION;
-
-    if (t >= 1) {
-      pop.el.remove();
-      activePops.splice(i, 1);
-      continue;
-    }
-
-    // Fly outward at angle, decelerate
-    const dist = t * 60;
-    const xOffset = Math.cos(pop.angle) * dist;
-    const yOffset = Math.sin(pop.angle) * dist;
-    pop.el.style.transform = `translate(-50%, -50%) translate(${xOffset}px, ${yOffset}px) scale(${1 - t * 0.3})`;
-    pop.el.style.opacity = String(1 - t * t);
-  }
+  // No-op: CSS animations handle all movement and fade
 }
 
 let popTimer = 0;
@@ -1999,10 +1984,13 @@ function spawnCafePop(cafeIndex: number) {
   el.textContent = `+${formatMoney(perCafe)}`;
   el.style.left = `${sx}px`;
   el.style.top = `${sy}px`;
-  popsContainer.appendChild(el);
-
   const angle = (-10 - Math.random() * 40) * (Math.PI / 180);
-  activePops.push({ el, startTime: _frameTime, sx, sy, angle });
+  const dx = Math.cos(angle) * 60;
+  const dy = Math.sin(angle) * 60;
+  el.style.setProperty('--dx', `${dx}px`);
+  el.style.setProperty('--dy', `${dy}px`);
+  popsContainer.appendChild(el);
+  setTimeout(() => el.remove(), POP_DURATION + 100);
 }
 
 function tickMoneyPops(delta: number) {
@@ -3210,10 +3198,11 @@ function gameLoop(time: number) {
   // ── Churn tick ──
   tickChurn(cappedDelta);
 
-  // ── Tenants (only if active, render throttled) ──
+  // ── Tenants (only if active) ──
   if (activeTenants.length > 0) {
     updateTenants(visualDelta);
-    markDirty();
+    // Only mark dirty occasionally for tenant movement (10fps is enough)
+    if (_currentFrame % 12 === 0) markDirty();
   }
 
   // ── Money pops (DOM, throttled with the pops themselves) ──
@@ -3246,8 +3235,8 @@ function gameLoop(time: number) {
     checkSignAchievements();
   }
 
-  // ── Only render when needed ──
-  if (needsRender) {
+  // ── Only render when needed, capped at 30fps ──
+  if (needsRender && _currentFrame % 4 === 0) {
     renderer.render(scene, camera);
     needsRender = false;
   }
