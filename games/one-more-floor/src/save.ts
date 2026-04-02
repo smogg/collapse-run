@@ -17,7 +17,7 @@ export interface SaveData {
   }>;
   neighborhoodCounts: Record<string, number>;
   businessUpgradeLevels: Record<string, Record<string, number>>;
-  earnedAchievements: string[];
+  earnedAchievements?: string[];
   propMgmtLevel: number;
   totalStudios: number;
   totalEvents: number;
@@ -57,4 +57,22 @@ export async function removeSaveFromIndex(platform: GamePlatform, cityName: stri
   const index = await loadSaveIndex(platform);
   const filtered = index.filter(s => s.cityName !== cityName);
   await platform.save('__save_index__', JSON.stringify(filtered));
+}
+
+export interface AccountData {
+  earnedAchievements: string[];
+}
+
+export async function loadAccountData(platform: GamePlatform): Promise<AccountData> {
+  const raw = await platform.load('__account__');
+  if (!raw) return { earnedAchievements: [] };
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return { earnedAchievements: [] };
+  }
+}
+
+export async function saveAccountData(platform: GamePlatform, data: AccountData): Promise<void> {
+  await platform.save('__account__', JSON.stringify(data));
 }

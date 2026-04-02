@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { detectPlatform, type GamePlatform } from './platform';
 import { getRandomCity } from './cities';
 import type { SaveData, SaveMeta } from './save';
-import { loadSaveIndex, updateSaveIndex, removeSaveFromIndex } from './save';
+import { loadSaveIndex, updateSaveIndex, removeSaveFromIndex, loadAccountData, saveAccountData } from './save';
 
 let platform: GamePlatform;
 
@@ -253,7 +253,6 @@ interface GameState {
   adClicks: number;       // total clicks (for display)
   activeEvent: { event: CityEvent; timeLeft: number } | null;
   eventCooldown: number;  // seconds until next event
-  earnedAchievements: Set<string>;
   totalMoneyEarned: number;
   totalStudios: number;
   totalEvents: number;
@@ -302,11 +301,12 @@ const state: GameState = {
   adClicks: 0,
   activeEvent: null,
   eventCooldown: 30,
-  earnedAchievements: new Set(),
   totalMoneyEarned: 0,
   totalStudios: 0,
   totalEvents: 0,
 };
+
+let accountAchievements: Set<string> = new Set();
 
 // ── Save/Load Serialization ──────────────────────────────────
 function serializeState(cityName: string): SaveData {
@@ -332,7 +332,6 @@ function serializeState(cityName: string): SaveData {
         Object.fromEntries(levels.map(l => [l.id, l.level])),
       ])
     ),
-    earnedAchievements: [...state.earnedAchievements],
     propMgmtLevel,
     totalStudios: state.totalStudios,
     totalEvents: state.totalEvents,
@@ -349,7 +348,6 @@ function deserializeState(data: SaveData): void {
   state.adClicks = data.adClicks ?? 0;
   state.activeEvent = null;
   state.eventCooldown = 120;
-  state.earnedAchievements = new Set(data.earnedAchievements ?? []);
   state.totalStudios = data.totalStudios ?? 0;
   state.totalEvents = data.totalEvents ?? 0;
 
@@ -389,9 +387,17 @@ function deserializeState(data: SaveData): void {
   propMgmtLevel = data.propMgmtLevel ?? 0;
   peakMoney = state.money;
 
-  // Restore achievements
+  // Migrate old per-city achievements to account
+  if (data.earnedAchievements) {
+    for (const id of data.earnedAchievements) {
+      accountAchievements.add(id);
+    }
+    saveAccountData(platform, { earnedAchievements: [...accountAchievements] });
+  }
+
+  // Sync achievements from account data
   for (const a of achievements) {
-    a.unlocked = state.earnedAchievements.has(a.id);
+    a.unlocked = accountAchievements.has(a.id);
   }
 }
 
@@ -948,8 +954,10 @@ function checkAchievements() {
   for (const a of achievements) {
     if (!a.unlocked && a.check()) {
       a.unlocked = true;
+      accountAchievements.add(a.id);
       triggerGlow('gold', 2500);
       showAchievementPopup(a);
+      saveAccountData(platform, { earnedAchievements: [...accountAchievements] });
     }
   }
 }
@@ -1048,7 +1056,7 @@ function showAchievementToast(ach: typeof CONFIG.achievementSigns[0]) {
 
 function checkSignAchievements() {
   for (const ach of CONFIG.achievementSigns) {
-    if (state.earnedAchievements.has(ach.id)) continue;
+    if (accountAchievements.has(ach.id)) continue;
     let earned = false;
     switch (ach.trigger) {
       case 'floors': earned = state.floorCount >= ach.value; break;
@@ -1060,9 +1068,11 @@ function checkSignAchievements() {
       case 'penthouses': earned = state.floorStates.some(f => f.isPenthouse); break;
     }
     if (earned) {
-      state.earnedAchievements.add(ach.id);
+      accountAchievements.add(ach.id);
       spawnAchievementSign(ach);
       showAchievementToast(ach);
+      // Save account data
+      saveAccountData(platform, { earnedAchievements: [...accountAchievements] });
     }
   }
 }
@@ -3176,7 +3186,7 @@ async function rebuildBuildingFromState() {
 
   // Rebuild achievement signs
   for (const ach of CONFIG.achievementSigns) {
-    if (state.earnedAchievements.has(ach.id)) {
+    if (accountAchievements.has(ach.id)) {
       spawnAchievementSign(ach);
     }
   }
@@ -3199,6 +3209,16 @@ const startButtons = document.getElementById('start-buttons')!;
 async function showStartScreen() {
   platform = detectPlatform();
   await platform.init();
+
+  // Load account-level achievements
+  const accountData = await loadAccountData(platform);
+  accountAchievements = new Set(accountData.earnedAchievements);
+  // Sync to achievements array
+  for (const a of achievements) {
+    a.unlocked = accountAchievements.has(a.id);
+  }
+
+  menuBtn.style.display = 'none';
 
   const saves = await loadSaveIndex(platform);
   startButtons.innerHTML = '';
@@ -3323,6 +3343,7 @@ async function startNewGame(existingSaves: SaveMeta[]) {
   currentCityName = getRandomCity(usedCities);
   startScreen.classList.add('hidden');
   await initGame();
+  menuBtn.style.display = 'flex';
 }
 
 async function loadAndStart(cityName: string) {
@@ -3337,8 +3358,13 @@ async function loadAndStart(cityName: string) {
     startScreen.classList.add('hidden');
     await initGame();
     deserializeState(data);
+    // Sync account achievements
+    for (const a of achievements) {
+      a.unlocked = accountAchievements.has(a.id);
+    }
     // Rebuild building visually
     await rebuildBuildingFromState();
+    menuBtn.style.display = 'flex';
     renderUI();
   } catch (e) {
     alert('Failed to load save: ' + e);
@@ -3361,6 +3387,54 @@ async function initGame() {
     renderUI();
     markDirty();
   }
+}
+
+// ── In-Game Menu ─────────────────────────────────────────────
+const menuBtn = document.getElementById('menu-btn')!;
+const gameMenu = document.getElementById('game-menu')!;
+const menuResume = document.getElementById('menu-resume')!;
+const menuSave = document.getElementById('menu-save')!;
+const menuSettings = document.getElementById('menu-settings')!;
+const menuQuit = document.getElementById('menu-quit')!;
+
+menuBtn.addEventListener('click', () => {
+  gameMenu.classList.add('active');
+});
+
+menuResume.addEventListener('click', () => {
+  gameMenu.classList.remove('active');
+});
+
+menuSave.addEventListener('click', async () => {
+  await autoSave();
+  showSaveNotification();
+  gameMenu.classList.remove('active');
+});
+
+menuSettings.addEventListener('click', () => {
+  // For now just close menu — settings page coming later
+  gameMenu.classList.remove('active');
+});
+
+menuQuit.addEventListener('click', async () => {
+  await autoSave();
+  gameMenu.classList.remove('active');
+  // Show start screen
+  startScreen.classList.remove('hidden');
+  showStartScreen();
+});
+
+function showSaveNotification() {
+  const n = document.createElement('div');
+  n.style.cssText = `
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    background:rgba(0,0,0,0.8); color:#4ade80; padding:8px 20px;
+    border-radius:8px; font-size:14px; z-index:2000;
+    animation: fadeInUp 0.3s ease-out;
+  `;
+  n.textContent = '\u2713 Game saved';
+  document.body.appendChild(n);
+  setTimeout(() => n.remove(), 2000);
 }
 
 // Show start screen immediately

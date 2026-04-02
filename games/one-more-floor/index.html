@@ -796,6 +796,78 @@
       cursor: pointer;
       font-size: 14px;
     }
+
+    #menu-btn {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 30;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: white;
+      font-size: 20px;
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      cursor: pointer;
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+    #menu-btn:hover {
+      background: rgba(0,0,0,0.7);
+    }
+
+    #game-menu {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(5px);
+      z-index: 1500;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    #game-menu.active {
+      display: flex;
+    }
+    .menu-panel {
+      background: rgba(20,25,40,0.95);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 16px;
+      padding: 24px;
+      width: 300px;
+      max-width: 90%;
+      text-align: center;
+      color: white;
+    }
+    .menu-panel h2 {
+      margin-bottom: 16px;
+      font-size: 20px;
+    }
+    .menu-option {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 8px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      color: white;
+      font-size: 15px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .menu-option:hover {
+      background: rgba(255,255,255,0.15);
+    }
+    .menu-option.danger {
+      color: #ff6666;
+      border-color: rgba(255,100,100,0.2);
+    }
   </style>
 </head>
 <body>
@@ -812,6 +884,7 @@
     </div>
   </div>
   <div id="ui">
+    <button id="menu-btn" title="Menu">&#9881;&#65039;</button>
     <div id="money-pops"></div>
     <div id="floor-panels"></div>
     <div id="panel">
@@ -854,6 +927,15 @@
         <div class="section-header">Achievements</div>
         <div id="achievements-list"></div>
       </div>
+    </div>
+  </div>
+  <div id="game-menu">
+    <div class="menu-panel">
+      <h2>Menu</h2>
+      <button class="menu-option" id="menu-resume">&#9654; Resume</button>
+      <button class="menu-option" id="menu-save">&#128190; Save Game</button>
+      <button class="menu-option" id="menu-settings">&#9881;&#65039; Settings</button>
+      <button class="menu-option danger" id="menu-quit">&#128682; Save &amp; Quit</button>
     </div>
   </div>
   <script type="module" src="/src/main.ts"></script>
