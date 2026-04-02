@@ -6,7 +6,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 // ══════════════════════════════════════════════════════════════
 const CONFIG = {
   // Economy
-  baseRent: 80000,               // rent per tenant with no upgrades
+  baseRent: 80,               // rent per tenant with no upgrades
   incomeTickRate: 0.1,      // minimum money increment
 
   // Floors
@@ -928,6 +928,7 @@ function spawnAchievementSign(ach: typeof CONFIG.achievementSigns[0]) {
 }
 
 function updateAchievementSignPositions() {
+  if (!_cameraMovedThisFrame && !needsRender) return;
   for (const sign of achievementSignLabels) {
     const projected = sign.position.clone().project(camera);
     const hw = window.innerWidth / 2;
@@ -1015,10 +1016,13 @@ let bulkPhaseUnlocked = false; // once unlocked, stays unlocked forever
 
 function isInBulkPhase(): boolean {
   if (bulkPhaseUnlocked) return true;
+  if (_bulkPhaseCached !== null) return _bulkPhaseCached;
   if (state.floorCount >= PER_FLOOR_CAP && allFloorsFullyUpgraded()) {
     bulkPhaseUnlocked = true;
+    _bulkPhaseCached = true;
     return true;
   }
+  _bulkPhaseCached = false;
   return false;
 }
 
@@ -1282,18 +1286,22 @@ function updateWeatherVisuals(eventId: string | null, delta: number) {
     markDirty();
   }
 
-  // ── Rain animation ──
+  // ── Rain animation (throttled to every other frame) ──
   if (rainMesh.visible) {
+    rainFrameSkip++;
     const pos = rainGeo.attributes.position as THREE.BufferAttribute;
-    for (let i = 0; i < rainCount; i++) {
-      pos.array[i * 3 + 1] -= 12 * delta;
-      if (pos.array[i * 3 + 1] < 0) {
-        pos.array[i * 3 + 1] = 12 + Math.random() * 3;
-        pos.array[i * 3] = (Math.random() - 0.5) * 20;
-        pos.array[i * 3 + 2] = (Math.random() - 0.5) * 20;
+    if (rainFrameSkip % 2 === 0) {
+      const rainDelta = delta * 2; // compensate for skipped frame
+      for (let i = 0; i < rainCount; i++) {
+        pos.array[i * 3 + 1] -= 12 * rainDelta;
+        if (pos.array[i * 3 + 1] < 0) {
+          pos.array[i * 3 + 1] = 12 + Math.random() * 3;
+          pos.array[i * 3] = (Math.random() - 0.5) * 20;
+          pos.array[i * 3 + 2] = (Math.random() - 0.5) * 20;
+        }
       }
+      pos.needsUpdate = true;
     }
-    pos.needsUpdate = true;
 
     // Lightning
     lightningTimer += delta;
@@ -1319,7 +1327,7 @@ function updateWeatherVisuals(eventId: string | null, delta: number) {
     for (let i = 0; i < confettiCount; i++) {
       // Fall slowly + drift sideways
       pos.array[i * 3] += confettiVelocities[i * 3] * delta;
-      pos.array[i * 3 + 1] -= (1.5 + Math.sin(performance.now() * 0.003 + i) * 0.5) * delta;
+      pos.array[i * 3 + 1] -= (1.5 + Math.sin(_frameTime * 0.003 + i) * 0.5) * delta;
       pos.array[i * 3 + 2] += confettiVelocities[i * 3 + 2] * delta;
       // Reset when below ground
       if (pos.array[i * 3 + 1] < 0) {
@@ -1351,7 +1359,7 @@ function updateWeatherVisuals(eventId: string | null, delta: number) {
       }
     }
     sPos.needsUpdate = true;
-    sparkleMat.opacity = 0.5 + Math.sin(performance.now() * 0.005) * 0.3;
+    sparkleMat.opacity = 0.5 + Math.sin(_frameTime * 0.005) * 0.3;
 
     // Subtle camera flashes — less frequent, dimmer
     flashTimer += delta;
@@ -1656,11 +1664,71 @@ function spawnMoneyPop(floorIndex: number) {
   // Fly to the RIGHT and slightly upward (10° to 50° upward-right)
   const angle = (-10 - Math.random() * 40) * (Math.PI / 180);
 
-  activePops.push({ el, startTime: performance.now(), sx, sy, angle });
+  activePops.push({ el, startTime: _frameTime, sx, sy, angle });
+}
+
+function spawnMoneyPopStaggered(floorIndex: number, delayMs: number) {
+  const worldPos = new THREE.Vector3(
+    0.6 + Math.random() * 0.2,
+    (floorIndex + 0.5) * actualFloorHeight,
+    0.3
+  );
+  buildingGroup.localToWorld(worldPos);
+  worldPos.project(camera);
+
+  const hw = window.innerWidth / 2;
+  const hh = window.innerHeight / 2;
+  const sx = worldPos.x * hw + hw;
+  const sy = -(worldPos.y * hh) + hh;
+
+  if (worldPos.z <= 0 || worldPos.z >= 1) return;
+
+  const floorIncome = getFloorIncome(floorIndex);
+  if (floorIncome <= 0) return;
+  const el = document.createElement('div');
+  el.className = 'money-pop';
+  el.textContent = `+${formatMoney(floorIncome)}`;
+  el.style.left = `${sx}px`;
+  el.style.top = `${sy}px`;
+  popsContainer.appendChild(el);
+
+  const angle = (-10 - Math.random() * 40) * (Math.PI / 180);
+  activePops.push({ el, startTime: _frameTime + delayMs, sx, sy, angle });
+}
+
+function spawnCafePopStaggered(cafeIndex: number, delayMs: number) {
+  const cafeVis = HOOD_VISUALS['cafe'];
+  if (cafeIndex >= cafeVis.positions.length) return;
+  const cafePos = cafeVis.positions[cafeIndex];
+
+  const worldPos = new THREE.Vector3(cafePos.x, 0.5, cafePos.z);
+  worldPos.project(camera);
+
+  const hw = window.innerWidth / 2;
+  const hh = window.innerHeight / 2;
+  const sx = worldPos.x * hw + hw;
+  const sy = -(worldPos.y * hh) + hh;
+
+  if (worldPos.z <= 0 || worldPos.z >= 1) return;
+
+  const cafeDef = neighborhoodUpgrades.find(n => n.id === 'cafe');
+  if (!cafeDef || cafeDef.count === 0) return;
+  const cafeIncome = getNeighborhoodIncome();
+  const perCafe = Math.floor(cafeIncome / cafeDef.count);
+
+  const el = document.createElement('div');
+  el.className = 'money-pop cafe-pop';
+  el.textContent = `+${formatMoney(perCafe)}`;
+  el.style.left = `${sx}px`;
+  el.style.top = `${sy}px`;
+  popsContainer.appendChild(el);
+
+  const angle = (-10 - Math.random() * 40) * (Math.PI / 180);
+  activePops.push({ el, startTime: _frameTime + delayMs, sx, sy, angle });
 }
 
 function updateMoneyPops() {
-  const now = performance.now();
+  const now = _frameTime;
   for (let i = activePops.length - 1; i >= 0; i--) {
     const pop = activePops[i];
     const elapsed = now - pop.startTime;
@@ -1712,20 +1780,19 @@ function spawnCafePop(cafeIndex: number) {
   popsContainer.appendChild(el);
 
   const angle = (-10 - Math.random() * 40) * (Math.PI / 180);
-  activePops.push({ el, startTime: performance.now(), sx, sy, angle });
+  activePops.push({ el, startTime: _frameTime, sx, sy, angle });
 }
 
 function tickMoneyPops(delta: number) {
   popTimer += delta;
   if (popTimer >= POP_INTERVAL) {
     popTimer = 0;
-    // Pop from each floor that has tenants
+    // Batch all pops — no setTimeout, use staggered startTime instead
     let popCount = 0;
     for (let i = 0; i < state.floorCount; i++) {
       const floor = state.floorStates[i];
       if (floor && floor.tenants > 0) {
-        // Stagger slightly so they don't all appear at once
-        setTimeout(() => spawnMoneyPop(i), popCount * 80);
+        spawnMoneyPopStaggered(i, popCount * 80);
         popCount++;
       }
     }
@@ -1734,7 +1801,7 @@ function tickMoneyPops(delta: number) {
     if (cafeDef && cafeDef.count > 0) {
       const maxCafePops = Math.min(cafeDef.count, 3);
       for (let i = 0; i < maxCafePops; i++) {
-        setTimeout(() => spawnCafePop(i), (popCount + i) * 80);
+        spawnCafePopStaggered(i, (popCount + i) * 80);
       }
     }
   }
@@ -1812,6 +1879,7 @@ function ensureFloorPanels() {
           state.money -= cost;
           floor.amenityInstalls.set(next.id, floor.maxTenants);
           next.totalInstalled += missing;
+          invalidateUpgradeCache();
           renderUI();
         }
       } else if (isFloorFullyUpgraded(floorIndex) && floorIndex === state.floorCount - 1 && !floor.isPenthouse && !floor.hasPenthouse) {
@@ -1835,6 +1903,7 @@ function ensureFloorPanels() {
           floor.studioLevel++;
           state.totalStudios++;
           floor.maxTenants = getTotalMaxTenants(floor.studioLevel);
+          invalidateUpgradeCache();
           renderUI();
         }
       } else if (isFloorComplete(floorIndex) && !floor.hasPenthouse && floorIndex >= PENTHOUSE_UNLOCK_FLOOR) {
@@ -1856,6 +1925,7 @@ function ensureFloorPanels() {
 
 // Position-only update — runs every frame for smooth movement
 function updateFloorPanelPositions() {
+  if (!_cameraMovedThisFrame && !needsRender) return;
   for (let i = 0; i < floorPanels.length; i++) {
     const panel = floorPanels[i];
     const worldPos = new THREE.Vector3(-0.8, (i + 0.5) * actualFloorHeight, 0);
@@ -2088,6 +2158,7 @@ floorBtn.addEventListener('click', () => {
     floorsPurchased++;
     state.floorStates.push(makeFloorState(0));
     addFloorToBuilding();
+    invalidateUpgradeCache();
     triggerGlow('green', 800);
     markDirty();
     renderUI();
@@ -2148,6 +2219,7 @@ for (const a of amenities) {
         a.totalInstalled += missing;
       }
     }
+    invalidateUpgradeCache();
     renderUI();
   });
   bulkEl.appendChild(btn);
@@ -2171,6 +2243,7 @@ bulkStudioBtn.addEventListener('click', () => {
       floor.maxTenants = getTotalMaxTenants(floor.studioLevel);
     }
   }
+  invalidateUpgradeCache();
   renderUI();
 });
 bulkEl.appendChild(bulkStudioBtn);
@@ -2445,7 +2518,7 @@ function renderAchievementsUI() {
 }
 
 function renderUI() {
-  const income = getTotalRentPerSecond();
+  const income = getTotalRentPerSecondCached();
   const avgRent = getAverageRentPerTenant();
   const totalTenants = getTotalTenants();
   const totalSlots = getTotalSlots();
@@ -2729,6 +2802,25 @@ let needsRender = true; // flag for Three.js re-render
 // Mark scene dirty when something visual changes
 function markDirty() { needsRender = true; }
 
+// ── Performance caches ──────────────────────────────────────
+let _cachedRentPerSecond = 0;
+let _rentCacheFrame = -1;
+let _currentFrame = 0;
+
+function getTotalRentPerSecondCached(): number {
+  if (_rentCacheFrame === _currentFrame) return _cachedRentPerSecond;
+  _cachedRentPerSecond = getTotalRentPerSecond();
+  _rentCacheFrame = _currentFrame;
+  return _cachedRentPerSecond;
+}
+
+let _cameraMovedThisFrame = false;
+let rainFrameSkip = 0;
+let _bulkPhaseCached: boolean | null = null;
+let _frameTime = 0;
+
+function invalidateUpgradeCache() { _bulkPhaseCached = null; }
+
 function showWelcomeBack(earned: number, seconds: number) {
   const banner = document.createElement('div');
   banner.style.cssText = `
@@ -2753,6 +2845,11 @@ function showWelcomeBack(earned: number, seconds: number) {
 function gameLoop(time: number) {
   requestAnimationFrame(gameLoop);
 
+  _currentFrame++;
+  _cameraMovedThisFrame = false;
+  const frameTime = performance.now();
+  _frameTime = frameTime;
+
   const rawDelta = (time - lastTime) / 1000;
   lastTime = time;
   const cappedDelta = Math.min(rawDelta, 14400); // cap at 4 hours
@@ -2760,12 +2857,12 @@ function gameLoop(time: number) {
 
   // ── Welcome back notification for idle earnings ──
   if (cappedDelta > 5) {
-    const idleEarnings = getTotalRentPerSecond() * cappedDelta;
+    const idleEarnings = getTotalRentPerSecondCached() * cappedDelta;
     if (idleEarnings > 0) showWelcomeBack(idleEarnings, cappedDelta);
   }
 
   // ── Economy tick — use capped delta so idle time accrues income ──
-  const income = getTotalRentPerSecond();
+  const income = getTotalRentPerSecondCached();
   incomeAccumulator += income * cappedDelta;
   if (incomeAccumulator >= 0.1) {
     const amount = Math.floor(incomeAccumulator * 10) / 10;
@@ -2818,6 +2915,7 @@ function gameLoop(time: number) {
   // ── Camera animation ──
   const camDist = camera.position.distanceTo(cameraTargetPos);
   if (camDist > 0.01) {
+    _cameraMovedThisFrame = true;
     animateCamera();
     markDirty();
   }
