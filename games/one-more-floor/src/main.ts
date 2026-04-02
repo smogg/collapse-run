@@ -1296,7 +1296,7 @@ function floorsNeedingStudio(): number {
 // ── Three.js Setup ──────────────────────────────────────────
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -1314,7 +1314,7 @@ scene.add(ambientLight);
 const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
 dirLight.position.set(8, 12, 6);
 dirLight.castShadow = true;
-dirLight.shadow.mapSize.set(1024, 1024);
+dirLight.shadow.mapSize.set(512, 512);
 dirLight.shadow.camera.near = 0.1;
 dirLight.shadow.camera.far = 40;
 dirLight.shadow.camera.left = -10;
@@ -3201,8 +3201,7 @@ function gameLoop(time: number) {
   // ── Tenants (only if active) ──
   if (activeTenants.length > 0) {
     updateTenants(visualDelta);
-    // Only mark dirty occasionally for tenant movement (10fps is enough)
-    if (_currentFrame % 12 === 0) markDirty();
+    markDirty();
   }
 
   // ── Money pops (DOM, throttled with the pops themselves) ──
@@ -3235,8 +3234,8 @@ function gameLoop(time: number) {
     checkSignAchievements();
   }
 
-  // ── Only render when needed, capped at 30fps ──
-  if (needsRender && _currentFrame % 4 === 0) {
+  // ── Render when needed ──
+  if (needsRender) {
     renderer.render(scene, camera);
     needsRender = false;
   }
