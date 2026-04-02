@@ -4,6 +4,7 @@ import { detectPlatform, type GamePlatform } from './platform';
 import { getRandomCity } from './cities';
 import type { SaveData, SaveMeta } from './save';
 import { loadSaveIndex, updateSaveIndex, removeSaveFromIndex, loadAccountData, saveAccountData } from './save';
+import { playCashSound, playClickSound, playUpgradeSound, playNewFloorSound, playAchievementSound, playTenantSound, playStudioSound, playEventSound, playThunderSound, startRainAmbience, stopRainAmbience, setMuted, isMuted, preloadSounds } from './audio';
 
 let platform: GamePlatform;
 
@@ -110,21 +111,42 @@ const CONFIG = {
 
   // Achievement yard signs
   achievementSigns: [
-    { id: 'first_floor', name: 'First Floor!', trigger: 'floors' as const, value: 2, icon: '🏠' },
-    { id: 'five_floors', name: '5 Stories High', trigger: 'floors' as const, value: 5, icon: '🏢' },
-    { id: 'ten_floors', name: 'Skyscraper', trigger: 'floors' as const, value: 10, icon: '🏙️' },
-    { id: 'twenty_floors', name: 'To The Clouds', trigger: 'floors' as const, value: 20, icon: '☁️' },
-    { id: 'fifty_floors', name: 'Space Elevator', trigger: 'floors' as const, value: 50, icon: '🚀' },
-    { id: 'first_tenant', name: 'First Tenant', trigger: 'tenants' as const, value: 5, icon: '👤' },
-    { id: 'hundred_tenants', name: '100 Tenants', trigger: 'tenants' as const, value: 100, icon: '👥' },
-    { id: 'thousand_tenants', name: '1000 Tenants', trigger: 'tenants' as const, value: 1000, icon: '🏘️' },
-    { id: 'first_studio', name: 'Studio Upgrade', trigger: 'studios' as const, value: 1, icon: '🔨' },
-    { id: 'first_million', name: 'Millionaire', trigger: 'money_earned' as const, value: 1e6, icon: '💰' },
-    { id: 'first_billion', name: 'Billionaire', trigger: 'money_earned' as const, value: 1e9, icon: '💎' },
-    { id: 'first_trillion', name: 'Trillionaire', trigger: 'money_earned' as const, value: 1e12, icon: '👑' },
-    { id: 'first_event', name: 'Weathered', trigger: 'events' as const, value: 1, icon: '🌤️' },
-    { id: 'full_building', name: 'No Vacancy', trigger: 'occupancy_full' as const, value: 1, icon: '🔑' },
-    { id: 'first_penthouse', name: 'Luxury Living', trigger: 'penthouses' as const, value: 1, icon: '🥂' },
+    // Tenant milestones
+    { id: 'first_tenant', name: 'First Tenant', icon: 'icons/id-card.svg', bonus: 1.05, trigger: 'tenants' as const, value: 1 },
+    { id: 'ten_tenants', name: '10 Tenants', icon: 'icons/id-card.svg', bonus: 1.05, trigger: 'tenants' as const, value: 10 },
+    { id: 'fifty_tenants', name: '50 Tenants', icon: 'icons/sprint.svg', bonus: 1.08, trigger: 'tenants' as const, value: 50 },
+    { id: 'hundred_tenants', name: '100 Tenants', icon: 'icons/sprint.svg', bonus: 1.10, trigger: 'tenants' as const, value: 100 },
+    { id: 'five_hundred_tenants', name: '500 Tenants', icon: 'icons/star-formation.svg', bonus: 1.15, trigger: 'tenants' as const, value: 500 },
+    { id: 'thousand_tenants', name: '1000 Tenants', icon: 'icons/modern-city.svg', bonus: 1.20, trigger: 'tenants' as const, value: 1000 },
+
+    // Floor milestones
+    { id: 'first_floor', name: 'First Floor', icon: 'icons/family-house.svg', bonus: 1.05, trigger: 'floors' as const, value: 2 },
+    { id: 'five_floors', name: '5 Stories', icon: 'icons/upgrade.svg', bonus: 1.08, trigger: 'floors' as const, value: 5 },
+    { id: 'ten_floors', name: '10 Stories', icon: 'icons/upgrade.svg', bonus: 1.10, trigger: 'floors' as const, value: 10 },
+    { id: 'twenty_floors', name: 'Skyscraper', icon: 'icons/modern-city.svg', bonus: 1.15, trigger: 'floors' as const, value: 20 },
+    { id: 'fifty_floors', name: 'Mega Tower', icon: 'icons/modern-city.svg', bonus: 1.20, trigger: 'floors' as const, value: 50 },
+
+    // Money milestones
+    { id: 'first_million', name: 'Millionaire', icon: 'icons/two-coins.svg', bonus: 1.10, trigger: 'money_earned' as const, value: 1e6 },
+    { id: 'first_billion', name: 'Billionaire', icon: 'icons/money-stack.svg', bonus: 1.15, trigger: 'money_earned' as const, value: 1e9 },
+    { id: 'first_trillion', name: 'Trillionaire', icon: 'icons/cash.svg', bonus: 1.20, trigger: 'money_earned' as const, value: 1e12 },
+    { id: 'quadrillionaire', name: 'Quadrillionaire', icon: 'icons/gold-mine.svg', bonus: 1.25, trigger: 'money_earned' as const, value: 1e15 },
+
+    // Studio milestones
+    { id: 'first_studio', name: 'Studio Upgrade', icon: 'icons/hammer-drop.svg', bonus: 1.08, trigger: 'studios' as const, value: 1 },
+    { id: 'five_studios', name: 'Renovation King', icon: 'icons/skills.svg', bonus: 1.10, trigger: 'studios' as const, value: 5 },
+    { id: 'twenty_studios', name: 'Master Builder', icon: 'icons/hammer-drop.svg', bonus: 1.15, trigger: 'studios' as const, value: 20 },
+
+    // Event milestones
+    { id: 'first_event', name: 'Weather Watcher', icon: 'icons/sun.svg', bonus: 1.05, trigger: 'events' as const, value: 1 },
+    { id: 'ten_events', name: 'Event Veteran', icon: 'icons/tornado.svg', bonus: 1.10, trigger: 'events' as const, value: 10 },
+    { id: 'fifty_events', name: 'Storm Chaser', icon: 'icons/tornado.svg', bonus: 1.15, trigger: 'events' as const, value: 50 },
+
+    // Special
+    { id: 'full_house', name: 'No Vacancy', icon: 'icons/crowned-heart.svg', bonus: 1.10, trigger: 'occupancy_full' as const, value: 0 },
+    { id: 'penthouse', name: 'Penthouse Suite', icon: 'icons/trophy.svg', bonus: 1.20, trigger: 'penthouses' as const, value: 0 },
+    { id: 'five_penthouses', name: 'Luxury Empire', icon: 'icons/laurel-crown.svg', bonus: 1.25, trigger: 'penthouses_count' as const, value: 5 },
+    { id: 'completionist', name: 'Completionist', icon: 'icons/medal.svg', bonus: 1.50, trigger: 'all_achievements' as const, value: 0 },
   ],
 
   // Visuals
@@ -947,6 +969,12 @@ function getAchievementMultiplier(): number {
   for (const a of achievements) {
     if (a.unlocked) mult *= a.multiplier;
   }
+  // Also apply sign achievement bonuses
+  for (const ach of CONFIG.achievementSigns) {
+    if (accountAchievements.has(ach.id)) {
+      mult *= ach.bonus;
+    }
+  }
   return mult;
 }
 
@@ -992,7 +1020,7 @@ interface AchievementSignLabel {
 const achievementSignLabels: AchievementSignLabel[] = [];
 let achievementSignCount = 0;
 
-function spawnAchievementSign(ach: typeof CONFIG.achievementSigns[0]) {
+function spawnAchievementSign(ach: typeof CONFIG.achievementSigns[0], showLabel: boolean = true) {
   const idx = achievementSignCount++;
   const x = -3 + idx * 0.6;
   const z = 2.0;
@@ -1014,16 +1042,18 @@ function spawnAchievementSign(ach: typeof CONFIG.achievementSigns[0]) {
   panel.castShadow = true;
   scene.add(panel);
 
-  // CSS overlay label
-  const labelEl = document.createElement('div');
-  labelEl.className = 'achievement-sign-label';
-  labelEl.textContent = `${ach.icon} ${ach.name}`;
-  document.getElementById('floor-panels')!.appendChild(labelEl);
+  // CSS overlay label — only show for newly earned achievements
+  if (showLabel) {
+    const labelEl = document.createElement('div');
+    labelEl.className = 'achievement-sign-label';
+    labelEl.innerHTML = `<img src="${ach.icon}" style="width:16px;height:16px;vertical-align:middle;filter:invert(1)"> ${ach.name}`;
+    document.getElementById('floor-panels')!.appendChild(labelEl);
 
-  achievementSignLabels.push({
-    el: labelEl,
-    position: new THREE.Vector3(x, 0.55, z),
-  });
+    achievementSignLabels.push({
+      el: labelEl,
+      position: new THREE.Vector3(x, 0.425, z),
+    });
+  }
 
   markDirty();
 }
@@ -1049,7 +1079,7 @@ function updateAchievementSignPositions() {
 function showAchievementToast(ach: typeof CONFIG.achievementSigns[0]) {
   const toast = document.createElement('div');
   toast.className = 'achievement-toast';
-  toast.innerHTML = `🏆 Achievement: ${ach.icon} ${ach.name}`;
+  toast.innerHTML = `<img src="icons/trophy.svg" style="width:16px;height:16px;vertical-align:middle;filter:invert(1)"> Achievement: <img src="${ach.icon}" style="width:16px;height:16px;vertical-align:middle;filter:invert(1)"> ${ach.name}`;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 3000);
 }
@@ -1066,11 +1096,14 @@ function checkSignAchievements() {
       case 'events': earned = state.totalEvents >= ach.value; break;
       case 'occupancy_full': earned = getTotalTenants() >= getTotalSlots() && getTotalSlots() > 0; break;
       case 'penthouses': earned = state.floorStates.some(f => f.isPenthouse); break;
+      case 'penthouses_count': earned = state.floorStates.filter(f => f.isPenthouse).length >= ach.value; break;
+      case 'all_achievements': earned = accountAchievements.size >= CONFIG.achievementSigns.length - 1; break;
     }
     if (earned) {
       accountAchievements.add(ach.id);
       spawnAchievementSign(ach);
       showAchievementToast(ach);
+      playAchievementSound();
       // Save account data
       saveAccountData(platform, { earnedAchievements: [...accountAchievements] });
     }
@@ -1890,6 +1923,10 @@ function tickMoneyPops(delta: number) {
   popTimer += delta;
   if (popTimer >= POP_INTERVAL) {
     popTimer = 0;
+    // Play cash sound — pitch scales with income (0-1 range, capped)
+    const totalIncome = getTotalRentPerSecond();
+    const incomeLevel = Math.min(1, Math.log10(Math.max(1, totalIncome)) / 6);
+    playCashSound(incomeLevel);
     // Only pop from max 3 random floors per tick to limit DOM creation
     const occupiedFloors: number[] = [];
     for (let i = 0; i < state.floorCount; i++) {
@@ -1973,6 +2010,7 @@ function ensureFloorPanels() {
           if (state.money >= cost && cost > 0) {
             state.money -= cost;
             floor.penthouseAmenityInstalls.set(nextPU.id, floor.maxTenants);
+            playUpgradeSound();
             renderUI();
           }
         }
@@ -1990,6 +2028,7 @@ function ensureFloorPanels() {
           floor.amenityInstalls.set(next.id, floor.maxTenants);
           next.totalInstalled += missing;
           invalidateUpgradeCache();
+          playUpgradeSound();
           renderUI();
         }
       } else if (isFloorFullyUpgraded(floorIndex) && floorIndex === state.floorCount - 1 && !floor.isPenthouse && !floor.hasPenthouse) {
@@ -2000,9 +2039,9 @@ function ensureFloorPanels() {
           floor.isPenthouse = true;
           floor.maxTenants = CONFIG.penthouseMaxTenants;
           floor.tenants = Math.min(floor.tenants, floor.maxTenants);
-          // Change 3D model color to gold
           convertFloorToGold(floorIndex);
           triggerGlow('gold', 2000);
+          playAchievementSound();
           renderUI();
         }
       } else if (isFloorFullyUpgraded(floorIndex) && floor.studioLevel < CONFIG.maxStudioLevel) {
@@ -2014,6 +2053,7 @@ function ensureFloorPanels() {
           state.totalStudios++;
           floor.maxTenants = getTotalMaxTenants(floor.studioLevel);
           invalidateUpgradeCache();
+          playStudioSound();
           renderUI();
         }
       } else if (isFloorComplete(floorIndex) && !floor.hasPenthouse && floorIndex >= PENTHOUSE_UNLOCK_FLOOR) {
@@ -2023,6 +2063,7 @@ function ensureFloorPanels() {
           state.money -= cost;
           floor.hasPenthouse = true;
           triggerGlow('gold', 1500);
+          playAchievementSound();
           renderUI();
         }
       }
@@ -2281,6 +2322,7 @@ floorBtn.addEventListener('click', () => {
     addFloorToBuilding();
     invalidateUpgradeCache();
     triggerGlow('green', 800);
+    playNewFloorSound();
     markDirty();
     renderUI();
   }
@@ -2301,6 +2343,7 @@ adBtn.addEventListener('click', () => {
     state.adBoost = Math.min(CONFIG.adMaxBoost, state.adBoost + CONFIG.adBoostPerClick);
     state.adTimer = CONFIG.adBoostMaxDuration;
     state.adClicks++;
+    playClickSound();
 
     // Spawn a flashy number on the button
     const pop = document.createElement('div');
@@ -2329,6 +2372,7 @@ for (const a of amenities) {
     const cost = getBulkAmenityCost(a);
     if (state.money < cost) return;
     state.money -= cost;
+    playUpgradeSound();
     // Fill all apartments on all floors with this amenity (skip penthouse floors)
     for (let i = 0; i < state.floorCount; i++) {
       const floor = state.floorStates[i];
@@ -2356,6 +2400,7 @@ bulkStudioBtn.addEventListener('click', () => {
   const cost = getBulkStudioCost();
   if (state.money < cost) return;
   state.money -= cost;
+  playStudioSound();
   for (let i = 0; i < state.floorCount; i++) {
     const floor = state.floorStates[i];
     if (floor && floor.studioLevel < CONFIG.maxStudioLevel && !floor.isPenthouse) {
@@ -2384,6 +2429,7 @@ for (const n of neighborhoodUpgrades) {
     n.count++;
     if (n.ownIncome > 0) triggerGlow('gold', 2000);
     spawnNeighborhoodModel(n);
+    playClickSound();
     renderUI();
   });
   hoodEl.appendChild(btn);
@@ -2441,6 +2487,7 @@ for (const bizId of BUSINESS_IDS) {
       if (state.money < cost) return;
       state.money -= cost;
       st.level++;
+      playUpgradeSound();
       renderUI();
     });
     btnsContainer.appendChild(btn);
@@ -2622,6 +2669,7 @@ let achievementBadgesCreated = false;
 function renderAchievementsUI() {
   if (!achievementBadgesCreated) {
     achievementBadgesCreated = true;
+    // Render old-style achievements
     for (const a of achievements) {
       const badge = document.createElement('div');
       badge.className = 'achievement-badge';
@@ -2629,11 +2677,35 @@ function renderAchievementsUI() {
       badge.innerHTML = `${a.icon}<div class="achievement-tooltip"><b>${a.name}</b><br>${a.desc}<br><span style="color:#7efa7e">${a.multiplier}x income</span></div>`;
       achievementsListEl.appendChild(badge);
     }
+    // Render sign achievements with SVG icons
+    for (const ach of CONFIG.achievementSigns) {
+      const badge = document.createElement('div');
+      badge.className = 'achievement-badge';
+      badge.id = `ach-sign-${ach.id}`;
+      const bonusPct = Math.round((ach.bonus - 1) * 100);
+      const earned = accountAchievements.has(ach.id);
+      const imgFilter = earned ? 'filter:invert(1)' : 'filter:invert(1) brightness(0.5)';
+      badge.innerHTML = `<img src="${ach.icon}" style="width:24px;height:24px;${imgFilter}"><div class="achievement-tooltip"><b>${ach.name}</b><br><span style="color:#7efa7e">+${bonusPct}% income</span></div>`;
+      if (earned) badge.classList.add('unlocked');
+      achievementsListEl.appendChild(badge);
+    }
   }
   for (const a of achievements) {
     const badge = document.getElementById(`ach-${a.id}`);
     if (badge) {
       badge.classList.toggle('unlocked', a.unlocked);
+    }
+  }
+  // Update sign achievement badges
+  for (const ach of CONFIG.achievementSigns) {
+    const badge = document.getElementById(`ach-sign-${ach.id}`);
+    if (badge) {
+      const earned = accountAchievements.has(ach.id);
+      badge.classList.toggle('unlocked', earned);
+      const img = badge.querySelector('img');
+      if (img) {
+        img.style.filter = earned ? 'invert(1)' : 'invert(1) brightness(0.5)';
+      }
     }
   }
 }
@@ -2823,6 +2895,8 @@ function tickTenantFill(delta: number) {
     if (bestFloor >= 0) {
       state.floorStates[bestFloor].tenants++;
       spawnTenant(true);
+      // Play tenant sound occasionally (not every single tenant)
+      if (Math.random() < 0.3) playTenantSound();
       markDirty();
     } else {
       // All floors full, stop accumulating
@@ -2877,6 +2951,7 @@ function tickCityEvents(delta: number) {
   if (state.activeEvent) {
     state.activeEvent.timeLeft -= delta;
     if (state.activeEvent.timeLeft <= 0) {
+      if (state.activeEvent.event.id === 'rainy_day') stopRainAmbience();
       state.activeEvent = null;
       state.eventCooldown = 20 + Math.random() * 40; // 20-60 seconds
       eventBanner.classList.remove('active');
@@ -2893,6 +2968,8 @@ function tickCityEvents(delta: number) {
         else if (event.rentMultiplier >= 10) triggerGlow('purple', 1500);
         else triggerGlow('green', 1000);
         eventBanner.classList.add('active');
+        playEventSound();
+        if (event.id === 'rainy_day') startRainAmbience();
       } else {
         state.eventCooldown = 30; // retry sooner if no eligible events
       }
@@ -3016,7 +3093,7 @@ function gameLoop(time: number) {
   // ── Tenants (only if active, render throttled) ──
   if (activeTenants.length > 0) {
     updateTenants(visualDelta);
-    if (_currentFrame % 3 === 0) markDirty();
+    markDirty();
   }
 
   // ── Money pops (DOM, throttled with the pops themselves) ──
@@ -3184,10 +3261,10 @@ async function rebuildBuildingFromState() {
     n.count = savedCount;
   }
 
-  // Rebuild achievement signs
+  // Rebuild achievement signs (no labels for already-earned ones)
   for (const ach of CONFIG.achievementSigns) {
     if (accountAchievements.has(ach.id)) {
-      spawnAchievementSign(ach);
+      spawnAchievementSign(ach, false);
     }
   }
 
@@ -3261,6 +3338,32 @@ async function showStartScreen() {
   settingsBtn.innerHTML = '<span class="btn-label">Settings</span>';
   settingsBtn.onclick = () => showSettings();
   startButtons.appendChild(settingsBtn);
+
+  // Achievement showcase
+  const achSection = document.createElement('div');
+  achSection.style.cssText = 'margin-top: 20px; text-align: left;';
+  let achGridHtml = '';
+  for (const ach of CONFIG.achievementSigns) {
+    const earned = accountAchievements.has(ach.id);
+    const bonusPct = Math.round((ach.bonus - 1) * 100);
+    if (earned) {
+      achGridHtml += `<div title="${ach.name} — ${bonusPct}% income boost" style="width:32px;height:32px;border:1px solid #ffd700;border-radius:4px;display:flex;align-items:center;justify-content:center;background:rgba(255,215,0,0.1)"><img src="${ach.icon}" style="width:20px;height:20px;filter:invert(1)"></div>`;
+    } else {
+      achGridHtml += `<div title="${ach.name} — ${bonusPct}% income boost" style="width:32px;height:32px;border:1px solid #555;border-radius:4px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.03);opacity:0.4"><img src="${ach.icon}" style="width:20px;height:20px;filter:invert(1)"></div>`;
+    }
+  }
+  achSection.innerHTML = `
+    <h3 style="color: #ffd700; font-size: 14px; margin-bottom: 8px;">
+      <img src="icons/trophy.svg" style="width:16px;height:16px;vertical-align:middle;filter:invert(1)"> Achievements (${accountAchievements.size}/${CONFIG.achievementSigns.length})
+    </h3>
+    <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+      ${achGridHtml}
+    </div>
+    <p style="color: #aaa; font-size: 11px; margin-top: 6px;">
+      Achievements boost income across all cities
+    </p>
+  `;
+  startButtons.appendChild(achSection);
 }
 
 function showSaveList(saves: SaveMeta[]) {
@@ -3342,6 +3445,7 @@ async function startNewGame(existingSaves: SaveMeta[]) {
   const usedCities = existingSaves.map(s => s.cityName);
   currentCityName = getRandomCity(usedCities);
   startScreen.classList.add('hidden');
+  preloadSounds();
   await initGame();
   menuBtn.style.display = 'flex';
 }
@@ -3356,6 +3460,7 @@ async function loadAndStart(cityName: string) {
     const data: SaveData = JSON.parse(raw);
     currentCityName = cityName;
     startScreen.classList.add('hidden');
+    preloadSounds();
     await initGame();
     deserializeState(data);
     // Sync account achievements
