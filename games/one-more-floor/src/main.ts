@@ -928,7 +928,7 @@ function spawnAchievementSign(ach: typeof CONFIG.achievementSigns[0]) {
 }
 
 function updateAchievementSignPositions() {
-  if (!_cameraMovedThisFrame) return;
+  if (!_cameraMovedThisFrame && !needsRender) return;
   for (const sign of achievementSignLabels) {
     const projected = sign.position.clone().project(camera);
     const hw = window.innerWidth / 2;
@@ -1932,7 +1932,7 @@ function ensureFloorPanels() {
 
 // Position-only update — runs every frame for smooth movement
 function updateFloorPanelPositions() {
-  if (!_cameraMovedThisFrame) return;
+  if (!_cameraMovedThisFrame && !needsRender) return;
 
   // On mobile, hide floor panels — building is too small
   const mobile = isMobile();
@@ -2910,7 +2910,19 @@ function gameLoop(time: number) {
   // ── Money pops (DOM, throttled with the pops themselves) ──
   tickMoneyPops(visualDelta);
 
-  // ── Floor panel positions every frame (cheap: just math + CSS transform) ──
+  // ── Weather visuals ──
+  const eventId = state.activeEvent?.event.id ?? null;
+  updateWeatherVisuals(eventId, visualDelta);
+
+  // ── Camera animation (BEFORE panel positions so projections use current camera) ──
+  const camDist = camera.position.distanceTo(cameraTargetPos);
+  if (camDist > 0.01) {
+    _cameraMovedThisFrame = true;
+    animateCamera();
+    markDirty();
+  }
+
+  // ── Floor panel positions (AFTER camera so projections are correct) ──
   updateFloorPanelPositions();
   updateAchievementSignPositions();
 
@@ -2923,18 +2935,6 @@ function gameLoop(time: number) {
     updateEventBannerUI();
     checkAchievements();
     checkSignAchievements();
-  }
-
-  // ── Weather visuals ──
-  const eventId = state.activeEvent?.event.id ?? null;
-  updateWeatherVisuals(eventId, visualDelta);
-
-  // ── Camera animation ──
-  const camDist = camera.position.distanceTo(cameraTargetPos);
-  if (camDist > 0.01) {
-    _cameraMovedThisFrame = true;
-    animateCamera();
-    markDirty();
   }
 
   // ── Only render when needed ──
