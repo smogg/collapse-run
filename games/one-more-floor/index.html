@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>One More Floor</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { width: 100%; height: 100%; overflow: hidden; touch-action: none; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; }
+    #game-canvas { width: 100%; height: 100%; display: block; }
+
+    #ui {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+    }
+
+    /* ── Right panel: stats + new floor button ── */
+    #panel {
+      position: absolute;
+      right: 16px;
+      top: 16px;
+      bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: auto;
+      width: 220px;
+      z-index: 20;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.2) transparent;
+    }
+
+    #panel::-webkit-scrollbar {
+      width: 4px;
+    }
+    #panel::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    #panel::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.2);
+      border-radius: 2px;
+    }
+
+    #stats {
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 14px 16px;
+      color: #fff;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    #stats .money {
+      font-size: 28px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    #stats .income {
+      font-size: 14px;
+      color: #7efa7e;
+      margin-top: 2px;
+    }
+
+    #stats .info-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: #eee;
+      margin-top: 6px;
+    }
+
+    #stats .info-row .label { color: #aaa; }
+
+    #vacancy-section {
+      margin-top: 4px;
+    }
+
+    #ad-btn-container {
+      margin-top: 6px;
+    }
+
+    #ad-btn-container .ad-btn {
+      width: 100%;
+      border-radius: 8px;
+      padding: 6px 8px !important;
+    }
+
+    #vacancy-bar {
+      width: 100%;
+      height: 6px;
+      background: #444;
+      border-radius: 3px;
+      margin-top: 4px;
+      overflow: hidden;
+    }
+
+    #vacancy-fill {
+      height: 100%;
+      background: #7efa7e;
+      border-radius: 3px;
+      transition: width 0.5s, background 0.5s;
+    }
+
+    #vacancy-label {
+      font-size: 12px;
+      color: #bbb;
+      margin-top: 3px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    #shop {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .shop-btn {
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.15s;
+      text-align: left;
+    }
+
+    .shop-btn:hover:not(:disabled) {
+      background: rgba(255,255,255,0.15);
+      transform: scale(1.02);
+    }
+
+    .shop-btn:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+
+    .shop-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      filter: grayscale(0.5);
+    }
+
+    .shop-btn .cost {
+      display: block;
+      font-size: 11px;
+      color: #ffd700;
+      margin-top: 2px;
+    }
+
+    .shop-btn .desc {
+      display: block;
+      font-size: 10px;
+      color: #aaa;
+      margin-top: 1px;
+    }
+
+    .floor-btn {
+      background: rgba(30, 120, 60, 0.85);
+      border-color: rgba(100, 220, 130, 0.5);
+      color: #fff;
+    }
+
+    .floor-btn:hover:not(:disabled) {
+      background: rgba(40, 150, 80, 0.9);
+    }
+
+    .floor-btn:disabled {
+      background: rgba(30, 60, 40, 0.6);
+      border-color: rgba(100, 220, 130, 0.15);
+      opacity: 0.6;
+    }
+
+    /* ── Neighborhood section ── */
+    #neighborhood-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .section-header {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #888;
+      padding: 4px 0;
+    }
+
+    .hood-btn {
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #fff;
+      padding: 8px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.15s;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .hood-btn:hover:not(:disabled) {
+      background: rgba(255,255,255,0.12);
+      transform: scale(1.02);
+    }
+
+    .hood-btn:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+
+    .hood-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .hood-btn .hood-icon { font-size: 18px; line-height: 1; }
+    .hood-btn .hood-info { display: flex; flex-direction: column; gap: 1px; flex: 1; }
+    .hood-btn .hood-name { font-weight: 600; font-size: 12px; }
+    .hood-btn .hood-desc { font-size: 10px; color: #aaa; }
+    .hood-btn .hood-detail { font-size: 10px; color: #aaa; }
+    .hood-btn .hood-detail .cost-val { color: #ffd700; font-weight: 600; }
+    .hood-btn .hood-detail .rent-val { color: #7efa7e; }
+    .hood-btn .hood-count {
+      font-size: 10px;
+      color: #8cf;
+      background: rgba(100,150,255,0.15);
+      border-radius: 4px;
+      padding: 2px 5px;
+      white-space: nowrap;
+    }
+
+    .hood-btn.maxed {
+      border-color: rgba(255,215,0,0.2);
+      opacity: 0.5;
+    }
+
+    /* ── Bulk upgrades (right panel, post floor 10) ── */
+    #bulk-upgrades {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .bulk-btn {
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #fff;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.15s;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .bulk-btn:hover:not(:disabled) {
+      background: rgba(255,255,255,0.15);
+      transform: scale(1.02);
+    }
+
+    .bulk-btn:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+
+    .bulk-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .bulk-btn .bulk-icon { font-size: 18px; }
+    .bulk-btn .bulk-info { display: flex; flex-direction: column; gap: 1px; }
+    .bulk-btn .bulk-name { font-weight: 600; font-size: 13px; }
+    .bulk-btn .bulk-detail { font-size: 11px; color: #aaa; }
+    .bulk-btn .bulk-detail .cost-val { color: #ffd700; font-weight: 600; }
+    .bulk-btn .bulk-detail .rent-val { color: #7efa7e; }
+    .bulk-btn .bulk-detail .count-val { color: #8cf; }
+
+    .bulk-btn.all-done {
+      border-color: rgba(255,215,0,0.3);
+      opacity: 0.6;
+    }
+
+    /* ── Floor upgrade panels (floating next to building) ── */
+    #floor-panels {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .floor-panel {
+      position: absolute;
+      top: 0; left: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      pointer-events: auto;
+      transition: opacity 0.2s;
+    }
+
+    .floor-rent-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #7efa7e;
+      background: rgba(0,0,0,0.6);
+      border-radius: 5px;
+      padding: 3px 7px;
+      white-space: nowrap;
+      text-align: center;
+      min-width: 44px;
+    }
+
+    .floor-rent-label.vacant {
+      color: #fa7e7e;
+    }
+
+    .floor-installed {
+      display: flex;
+      gap: 2px;
+      align-items: center;
+    }
+
+    .floor-installed-icon {
+      font-size: 11px;
+      opacity: 0.8;
+    }
+
+    .floor-complete {
+      font-size: 16px;
+      color: #ffd700;
+    }
+
+    .floor-buy-btn {
+      border-radius: 8px;
+      border: 1.5px solid rgba(255,255,255,0.15);
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      cursor: pointer;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .floor-buy-btn .btn-icon {
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .floor-buy-btn .btn-info {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      text-align: left;
+    }
+
+    .floor-buy-btn .btn-name {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .floor-buy-btn .btn-detail {
+      font-size: 10px;
+      color: #aaa;
+    }
+
+    .floor-buy-btn .btn-detail .cost-val {
+      color: #ffd700;
+      font-weight: 600;
+    }
+
+    .floor-buy-btn .btn-detail .rent-val {
+      color: #7efa7e;
+    }
+
+    .floor-buy-btn:hover:not(:disabled) {
+      background: rgba(0,0,0,0.8);
+      border-color: rgba(255,215,0,0.4);
+      transform: scale(1.03);
+    }
+
+    .floor-buy-btn:active:not(:disabled) {
+      transform: scale(0.96);
+    }
+
+    .floor-buy-btn.affordable {
+      border-color: rgba(255, 215, 0, 0.5);
+      animation: pulse 1.5s infinite;
+    }
+
+    .floor-buy-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.3); }
+      50% { box-shadow: 0 0 6px 2px rgba(255, 215, 0, 0.3); }
+    }
+
+    /* ── Money pops ── */
+    #money-pops {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 6;
+    }
+
+    .money-pop {
+      position: absolute;
+      font-size: 14px;
+      font-weight: 700;
+      color: #ffd700;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .money-pop.cafe-pop { color: #7efa7e; }
+
+    /* ── Ad boost button ── */
+    .ad-btn {
+      background: linear-gradient(135deg, rgba(255,120,50,0.85), rgba(255,80,80,0.85)) !important;
+      border: 2px solid rgba(255,200,100,0.6) !important;
+      text-align: center !important;
+      position: relative;
+      overflow: visible;
+    }
+    .ad-btn:hover:not(:disabled) {
+      background: linear-gradient(135deg, rgba(255,140,70,0.95), rgba(255,100,100,0.95)) !important;
+      transform: scale(1.04) !important;
+    }
+    .ad-btn:active:not(:disabled) {
+      transform: scale(0.93) !important;
+    }
+    .ad-btn.ad-active {
+      animation: ad-glow 1s infinite;
+    }
+    @keyframes ad-glow {
+      0%, 100% { box-shadow: 0 0 8px rgba(255,120,50,0.4); }
+      50% { box-shadow: 0 0 18px rgba(255,120,50,0.7); }
+    }
+    .ad-title {
+      display: block;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+    .ad-stats {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      margin-top: 2px;
+    }
+    .ad-boost { color: #fff; font-weight: 700; }
+    .ad-timer { color: rgba(255,255,255,0.8); }
+    .ad-clicks {
+      display: block;
+      font-size: 10px;
+      color: rgba(255,255,255,0.6);
+      margin-top: 1px;
+    }
+
+    .ad-click-pop {
+      position: absolute;
+      font-size: 16px;
+      font-weight: 800;
+      color: #ffd700;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+      pointer-events: none;
+      animation: ad-pop-fly 0.8s ease-out forwards;
+      z-index: 100;
+    }
+    @keyframes ad-pop-fly {
+      0% { transform: translate(-50%, 0) scale(1.2); opacity: 1; }
+      100% { transform: translate(-50%, -40px) scale(0.8); opacity: 0; }
+    }
+
+    /* ── Event Banner ── */
+    #event-banner {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(20, 30, 50, 0.95);
+      border: 2px solid #ffd700;
+      border-radius: 12px;
+      padding: 8px 20px;
+      color: white;
+      font-size: 14px;
+      z-index: 1000;
+      text-align: center;
+      display: none;
+      animation: eventSlideIn 0.5s ease-out;
+    }
+    #event-banner.active { display: block; }
+    #event-banner .event-name { font-size: 16px; font-weight: bold; }
+    #event-banner .event-timer { color: #ffd700; font-size: 12px; }
+    @keyframes eventSlideIn { from { top: -50px; opacity: 0; } to { top: 10px; opacity: 1; } }
+
+    /* ── Mobile ── */
+    @media (max-width: 600px) {
+      #stats {
+        position: fixed;
+        left: 6px;
+        top: 6px;
+        right: auto;
+        width: 150px;
+        padding: 8px 10px;
+        z-index: 25;
+        pointer-events: auto;
+      }
+      #panel {
+        right: 6px;
+        top: 6px;
+        bottom: 6px;
+        width: 160px;
+        gap: 5px;
+      }
+      #stats .money { font-size: 18px; }
+      #stats .income { font-size: 11px; }
+      #stats .info-row {
+        font-size: 11px;
+        flex-direction: column;
+        gap: 0;
+        margin-top: 4px;
+      }
+      #stats .info-row .label {
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      #vacancy-bar { margin-top: 4px; }
+      #vacancy-label { font-size: 10px; }
+      .shop-btn { padding: 5px 7px; font-size: 11px; }
+      .shop-btn .cost { font-size: 10px; }
+      .shop-btn .desc { font-size: 9px; }
+      .hood-btn { padding: 5px 7px; font-size: 10px; }
+      .hood-btn .hood-icon { font-size: 14px; }
+      .hood-btn .hood-name { font-size: 10px; }
+      .hood-btn .hood-desc { font-size: 9px; }
+      .hood-btn .hood-detail { font-size: 9px; }
+      #ad-btn-container { margin-top: 4px; }
+      #ad-btn-container .ad-btn { padding: 4px 6px !important; }
+      .ad-title { font-size: 10px !important; letter-spacing: 0 !important; }
+      .ad-stats { font-size: 9px; gap: 2px; }
+      .ad-boost { font-size: 9px; }
+      .ad-timer { font-size: 9px; }
+      .ad-clicks { font-size: 8px !important; margin-top: 0 !important; }
+      .section-header { font-size: 9px; }
+      .floor-buy-btn { padding: 4px 7px; }
+      .floor-buy-btn .btn-name { font-size: 10px; }
+      .floor-buy-btn .btn-detail { font-size: 9px; }
+      .floor-buy-btn .btn-icon { font-size: 13px; }
+      .floor-rent-label { font-size: 9px; padding: 2px 5px; }
+    }
+    #screen-glow {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      z-index: 999;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    #screen-glow.gold { background: radial-gradient(ellipse at center, rgba(255,215,0,0.3) 0%, transparent 70%); }
+    #screen-glow.green { background: radial-gradient(ellipse at center, rgba(100,255,100,0.3) 0%, transparent 70%); }
+    #screen-glow.purple { background: radial-gradient(ellipse at center, rgba(180,100,255,0.3) 0%, transparent 70%); }
+    #screen-glow.red { background: radial-gradient(ellipse at center, rgba(255,80,80,0.25) 0%, transparent 70%); }
+    #screen-glow.active { opacity: 1; }
+
+    @keyframes achievePop {
+      0% { transform: translate(-50%,-50%) scale(0.5); opacity: 0; }
+      50% { transform: translate(-50%,-50%) scale(1.1); }
+      100% { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+    }
+
+    #achievements-section { margin-top: 12px; }
+    #achievements-list { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; }
+    .achievement-badge {
+      width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+      font-size: 18px; border-radius: 6px; background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1); opacity: 0.3;
+      position: relative;
+    }
+    .achievement-badge.unlocked { opacity: 1; background: rgba(255,215,0,0.15); border-color: #ffd700; }
+    .achievement-badge .achievement-tooltip {
+      display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.9); border: 1px solid rgba(255,255,255,0.2);
+      padding: 6px 10px; border-radius: 6px; white-space: nowrap; font-size: 11px;
+      color: #fff; z-index: 100; margin-bottom: 4px;
+    }
+    .achievement-badge:hover .achievement-tooltip { display: block; }
+  </style>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+  <div id="screen-glow"></div>
+  <div id="event-banner"></div>
+  <div id="ui">
+    <div id="money-pops"></div>
+    <div id="floor-panels"></div>
+    <div id="panel">
+      <div id="stats">
+        <div class="money" id="money-display">$0</div>
+        <div class="income" id="income-display">$0/s</div>
+        <div class="info-row">
+          <span class="label">Floors</span>
+          <span id="floor-display">1</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Rent</span>
+          <span id="rent-display">$1 avg</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Fill rate</span>
+          <span id="fill-rate-display">0.15/s</span>
+        </div>
+        <div id="vacancy-section">
+          <div class="info-row" style="margin-top:8px">
+            <span class="label">Tenants</span>
+          </div>
+          <div id="vacancy-bar"><div id="vacancy-fill" style="width:10%"></div></div>
+          <div id="vacancy-label">
+            <span id="occupancy-display">1/10</span>
+            <span id="occupancy-pct">10%</span>
+          </div>
+          <div id="ad-btn-container"></div>
+        </div>
+      </div>
+      <div id="shop"></div>
+      <div id="bulk-upgrades" style="display:none"></div>
+      <div id="neighborhood-section">
+        <div class="section-header">Neighborhood</div>
+        <div id="neighborhood-upgrades"></div>
+      </div>
+      <div id="business-sections"></div>
+      <div id="achievements-section">
+        <div class="section-header">Achievements</div>
+        <div id="achievements-list"></div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
