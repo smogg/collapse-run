@@ -1,17 +1,28 @@
 export interface GamePlatform {
-  init(): Promise<void>;
+  init(onMuteChange?: (muted: boolean) => void): Promise<void>;
   save(key: string, data: string): Promise<void>;
   load(key: string): Promise<string | null>;
   listSaves(): Promise<string[]>;
   deleteSave(key: string): Promise<void>;
   showRewardedAd(onReward: () => void, onMute: () => void, onUnmute: () => void): void;
   hasAds(): boolean;
+  gameplayStart(): void;
+  gameplayStop(): void;
+  loadingStart(): void;
+  loadingStop(): void;
+  happytime(): void;
 }
 
 export class LocalStoragePlatform implements GamePlatform {
   private prefix = 'omf_save_';
 
-  async init(): Promise<void> {}
+  async init(_onMuteChange?: (muted: boolean) => void): Promise<void> {}
+
+  gameplayStart(): void {}
+  gameplayStop(): void {}
+  loadingStart(): void {}
+  loadingStop(): void {}
+  happytime(): void {}
 
   async save(key: string, data: string): Promise<void> {
     localStorage.setItem(this.prefix + key, data);
@@ -47,17 +58,49 @@ export class LocalStoragePlatform implements GamePlatform {
 export class CrazyGamesPlatform implements GamePlatform {
   private sdk: any = null;
 
-  async init(): Promise<void> {
+  async init(onMuteChange?: (muted: boolean) => void): Promise<void> {
     const cg = (window as any).CrazyGames;
     if (cg?.SDK) {
       this.sdk = cg.SDK;
       try {
         await this.sdk.init();
+        console.log('[Platform] CrazyGames SDK initialized');
+
+        // Respect the platform's initial mute state
+        if (onMuteChange && this.sdk.game?.settings) {
+          const initial = this.sdk.game.settings.muteAudio;
+          if (initial) onMuteChange(true);
+
+          this.sdk.game.addSettingsChangeListener((settings: { muteAudio: boolean }) => {
+            onMuteChange(settings.muteAudio);
+          });
+        }
       } catch {
         // SDK init failed — fall back to localStorage
+        console.warn('[Platform] CrazyGames SDK init failed');
         this.sdk = null;
       }
     }
+  }
+
+  gameplayStart(): void {
+    try { this.sdk?.game?.gameplayStart(); } catch {}
+  }
+
+  gameplayStop(): void {
+    try { this.sdk?.game?.gameplayStop(); } catch {}
+  }
+
+  loadingStart(): void {
+    try { this.sdk?.game?.loadingStart(); } catch {}
+  }
+
+  loadingStop(): void {
+    try { this.sdk?.game?.loadingStop(); } catch {}
+  }
+
+  happytime(): void {
+    try { this.sdk?.game?.happytime(); } catch {}
   }
 
   async save(key: string, data: string): Promise<void> {

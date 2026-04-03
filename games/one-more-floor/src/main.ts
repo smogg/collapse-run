@@ -1795,16 +1795,17 @@ function isMobile(): boolean {
 }
 
 function updateCamera() {
-  const scale = isMobile() ? 0.25 : 1;
-  buildingGroup.scale.setScalar(scale);
-  const buildingHeight = (state.floorCount + 1) * actualFloorHeight * scale;
+  buildingGroup.scale.setScalar(1);
+  const buildingHeight = (state.floorCount + 1) * actualFloorHeight;
   const lookAtY = buildingHeight * 0.45;
   const distance = Math.max(8, buildingHeight * 1.2 + 6);
 
   if (isMobile()) {
-    // Camera lower + look higher so building sits at bottom of screen
-    cameraTargetPos.set(distance * 0.15, lookAtY + distance * 0.1, distance);
-    cameraTargetLookAt.set(0, lookAtY + distance * 0.25, 0);
+    // Front-facing, building base near bottom of screen
+    const zoom = distance * 1.0;
+    const liftY = zoom * 0.25; // shift camera up so building appears lower
+    cameraTargetPos.set(zoom * 0.15, lookAtY + zoom * 0.15 + liftY, zoom);
+    cameraTargetLookAt.set(zoom * 0.1, lookAtY - zoom * 0.05 + liftY, 0);
   } else {
     cameraTargetPos.set(distance * 0.15, lookAtY + distance * 0.3, distance);
     cameraTargetLookAt.set(0, lookAtY, 0);
@@ -2132,14 +2133,9 @@ function ensureFloorPanels() {
 function updateFloorPanelPositions() {
   if (!_cameraMovedThisFrame && !needsRender) return;
 
-  // On mobile, hide floor panels — building is too small
   const mobile = isMobile();
-  if (mobile) {
-    for (const panel of floorPanels) {
-      panel.el.style.opacity = '0';
-    }
-    return;
-  }
+
+  const positions: { index: number; sx: number; sy: number }[] = [];
 
   for (let i = 0; i < floorPanels.length; i++) {
     const panel = floorPanels[i];
@@ -2152,8 +2148,32 @@ function updateFloorPanelPositions() {
     const sx = worldPos.x * hw + hw;
     const sy = -(worldPos.y * hh) + hh;
 
-    if (worldPos.z > 0 && worldPos.z < 1 && sx > 50 && sx < window.innerWidth - 50 && sy > 10 && sy < window.innerHeight - 10) {
-      panel.el.style.transform = `translate(-100%, -50%) translate(${sx}px, ${sy}px)`;
+    // Clamp sy so panels near bottom edge stay visible instead of being hidden
+    const clampedSy = Math.min(sy, window.innerHeight - 30);
+    if (worldPos.z > 0 && worldPos.z < 1 && sx > 50 && sx < window.innerWidth - 50 && clampedSy > 10) {
+      positions.push({ index: i, sx, sy: clampedSy });
+    } else {
+      panel.el.style.opacity = '0';
+    }
+  }
+
+  // Hide panels that would overlap (need vertical clearance)
+  const MIN_GAP = isMobile() ? 20 : 40;
+  const visible = new Set<number>();
+  // Process bottom-to-top (highest sy first = lowest floor)
+  positions.sort((a, b) => b.sy - a.sy);
+  let lastVisibleY = Infinity;
+  for (const pos of positions) {
+    if (lastVisibleY - pos.sy >= MIN_GAP) {
+      visible.add(pos.index);
+      lastVisibleY = pos.sy;
+    }
+  }
+
+  for (const pos of positions) {
+    const panel = floorPanels[pos.index];
+    if (visible.has(pos.index)) {
+      panel.el.style.transform = `translate(-100%, -50%) translate(${pos.sx}px, ${pos.sy}px)`;
       panel.el.style.opacity = '1';
     } else {
       panel.el.style.opacity = '0';
@@ -2164,6 +2184,7 @@ function updateFloorPanelPositions() {
 // Content update — runs throttled
 function updateFloorPanelContent() {
   ensureFloorPanels();
+  const mobile = isMobile();
 
   for (let i = 0; i < floorPanels.length; i++) {
     const panel = floorPanels[i];
@@ -2214,21 +2235,31 @@ function updateFloorPanelContent() {
       continue;
     }
 
-    // Rent label — show tenant count
-    panel.rentLabel.textContent = `${floor.tenants}/${floor.maxTenants}`;
-    panel.rentLabel.classList.toggle('vacant', !hasTenants);
+    // Rent label — show tenant count (hide on mobile)
+    if (mobile) {
+      panel.rentLabel.style.display = 'none';
+    } else {
+      panel.rentLabel.style.display = '';
+      panel.rentLabel.textContent = `${floor.tenants}/${floor.maxTenants}`;
+      panel.rentLabel.classList.toggle('vacant', !hasTenants);
+    }
 
-    // Installed icons — show coverage per amenity, or star if complete
-    const installEntries = amenities.map(a => `${a.id}:${floor.amenityInstalls.get(a.id) || 0}`).join(',');
-    const iconKey = floor.hasPenthouse ? 'penthouse' : complete ? 'complete' : `${installEntries}:s${floor.studioLevel}:m${floor.maxTenants}`;
-    if (panel.iconsEl.dataset.key !== iconKey) {
-      panel.iconsEl.dataset.key = iconKey;
-      if (floor.hasPenthouse) {
-        panel.iconsEl.innerHTML = '<span class="floor-complete" style="color:#ffd700">🏰</span>';
-      } else if (complete) {
-        panel.iconsEl.innerHTML = '<span class="floor-complete">\u2605</span>';
-      } else {
-        panel.iconsEl.innerHTML = '';
+    // Installed icons — show coverage per amenity, or star if complete (hide on mobile)
+    if (mobile) {
+      panel.iconsEl.style.display = 'none';
+    } else {
+      panel.iconsEl.style.display = '';
+      const installEntries = amenities.map(a => `${a.id}:${floor.amenityInstalls.get(a.id) || 0}`).join(',');
+      const iconKey = floor.hasPenthouse ? 'penthouse' : complete ? 'complete' : `${installEntries}:s${floor.studioLevel}:m${floor.maxTenants}`;
+      if (panel.iconsEl.dataset.key !== iconKey) {
+        panel.iconsEl.dataset.key = iconKey;
+        if (floor.hasPenthouse) {
+          panel.iconsEl.innerHTML = '<span class="floor-complete" style="color:#ffd700">🏰</span>';
+        } else if (complete) {
+          panel.iconsEl.innerHTML = '<span class="floor-complete">\u2605</span>';
+        } else {
+          panel.iconsEl.innerHTML = '';
+        }
       }
     }
 
@@ -2243,7 +2274,7 @@ function updateFloorPanelContent() {
       if (panel.buyBtn.dataset.key !== key) {
         panel.buyBtn.dataset.key = key;
         panel.buyBtn.innerHTML = `
-          <span class="btn-icon">${next.icon}</span>
+          ${mobile ? '' : `<span class="btn-icon">${next.icon}</span>`}
           <span class="btn-info">
             <span class="btn-name">${next.name}</span>
             <span class="btn-detail"><span class="cost-val">${formatMoney(cost)}</span> · <span class="rent-val">+$${next.rentBonus}/tenant</span></span>
@@ -2263,7 +2294,7 @@ function updateFloorPanelContent() {
         panel.buyBtn.innerHTML = `
           <span class="btn-icon">🥂</span>
           <span class="btn-info">
-            <span class="btn-name">Convert to Penthouse</span>
+            <span class="btn-name">Penthouse</span>
             <span class="btn-detail"><span class="cost-val">${formatMoney(cost)}</span> · <span class="rent-val">${CONFIG.penthouseRentMultiplier}x rent</span></span>
           </span>
         `;
@@ -2313,6 +2344,17 @@ function updateFloorPanelContent() {
 }
 
 // ── UI ──────────────────────────────────────────────────────
+const statsBox = document.getElementById('stats')!;
+const mobileEventSlot = document.getElementById('mobile-event-slot')!;
+
+// Toggle stats details on mobile
+statsBox.addEventListener('click', (e) => {
+  if (!isMobile()) return;
+  // Don't toggle if clicking a button inside (like hire agents)
+  if ((e.target as HTMLElement).closest('button')) return;
+  statsBox.classList.toggle('expanded');
+});
+
 const cityNameDisplay = document.getElementById('city-name-display')!;
 const moneyDisplay = document.getElementById('money-display')!;
 const incomeDisplay = document.getElementById('income-display')!;
@@ -2377,20 +2419,21 @@ floorBtn.addEventListener('click', () => {
     invalidateUpgradeCache();
     triggerGlow('green', 800);
     playNewFloorSound();
+    platform.happytime();
     markDirty();
     renderUI();
   }
 });
 shopEl.appendChild(floorBtn);
 
-// ── Online Ads Button ─────────────────────────────────────────
-const adBtn = document.createElement('button');
-adBtn.className = 'shop-btn ad-btn';
-adBtn.innerHTML = `
-  <span class="ad-title">🏠 HIRE AGENTS</span>
-  <span class="ad-stats">Attract tenants faster</span>
+// ── Hire Agents Button ────────────────────────────────────────
+const hireBtn = document.createElement('button');
+hireBtn.className = 'shop-btn hire-btn';
+hireBtn.innerHTML = `
+  <span class="hire-title">🏠 HIRE AGENTS</span>
+  <span class="hire-stats">Attract tenants faster</span>
 `;
-adBtn.addEventListener('click', () => {
+hireBtn.addEventListener('click', () => {
   const cost = getAdCost();
   if (state.money >= cost) {
     state.money -= cost;
@@ -2401,17 +2444,17 @@ adBtn.addEventListener('click', () => {
 
     // Spawn a flashy number on the button
     const pop = document.createElement('div');
-    pop.className = 'ad-click-pop';
+    pop.className = 'hire-click-pop';
     pop.textContent = `+${(CONFIG.adBoostPerClick).toFixed(2)}/s`;
-    pop.style.left = `${adBtn.offsetLeft + adBtn.offsetWidth / 2}px`;
-    pop.style.top = `${adBtn.offsetTop}px`;
-    adBtn.parentElement!.appendChild(pop);
+    pop.style.left = `${hireBtn.offsetLeft + hireBtn.offsetWidth / 2}px`;
+    pop.style.top = `${hireBtn.offsetTop}px`;
+    hireBtn.parentElement!.appendChild(pop);
     setTimeout(() => pop.remove(), 800);
 
     renderUI();
   }
 });
-document.getElementById('ad-btn-container')!.appendChild(adBtn);
+document.getElementById('hire-btn-container')!.appendChild(hireBtn);
 
 // ── Bulk Upgrade Buttons (right panel, post-cap) ─────────────
 const bulkEl = document.getElementById('bulk-upgrades')!;
@@ -2834,16 +2877,16 @@ function renderUI() {
     const allOccupied = totalTenants >= totalSlots;
     const adCost = getAdCost();
     const canAffordAd = state.money >= adCost && !allOccupied;
-    adBtn.disabled = !canAffordAd;
+    hireBtn.disabled = !canAffordAd;
     if (allOccupied) {
-      adBtn.style.opacity = '0.4';
-      adBtn.style.pointerEvents = 'none';
+      hireBtn.style.opacity = '0.4';
+      hireBtn.style.pointerEvents = 'none';
     } else {
-      adBtn.style.opacity = '';
-      adBtn.style.pointerEvents = '';
+      hireBtn.style.opacity = '';
+      hireBtn.style.pointerEvents = '';
     }
     const boostActive = state.adTimer > 0;
-    adBtn.className = boostActive ? 'shop-btn ad-btn ad-active' : 'shop-btn ad-btn';
+    hireBtn.className = boostActive ? 'shop-btn hire-btn hire-active' : 'shop-btn hire-btn';
   }
 
   // Show/hide per-floor panels vs bulk upgrades
@@ -3053,6 +3096,17 @@ function updateEventBannerUI() {
       <div>${e.event.description}</div>
       <div class="event-timer">${timeStr} remaining</div>
     `;
+    // On mobile, move event banner into the panel slot
+    if (isMobile() && eventBanner.parentElement !== mobileEventSlot) {
+      mobileEventSlot.appendChild(eventBanner);
+      eventBanner.classList.add('in-slot');
+      mobileEventSlot.classList.add('has-event');
+    }
+  } else if (isMobile() && eventBanner.parentElement === mobileEventSlot) {
+    // Move back to body when event ends
+    document.body.appendChild(eventBanner);
+    eventBanner.classList.remove('in-slot');
+    mobileEventSlot.classList.remove('has-event');
   }
 }
 
@@ -3373,7 +3427,7 @@ const startButtons = document.getElementById('start-buttons')!;
 
 async function showStartScreen() {
   platform = detectPlatform();
-  await platform.init();
+  await platform.init((muted) => setMuted(muted));
 
   // Load account-level achievements
   const accountData = await loadAccountData(platform);
@@ -3436,19 +3490,19 @@ async function showStartScreen() {
     const earned = accountAchievements.has(ach.id);
     const bonusPct = Math.round((ach.bonus - 1) * 100);
     if (earned) {
-      achGridHtml += `<div title="${ach.name} — ${bonusPct}% income boost" style="width:32px;height:32px;border:1px solid #ffd700;border-radius:4px;display:flex;align-items:center;justify-content:center;background:rgba(255,215,0,0.1)"><img src="${ach.icon}" style="width:20px;height:20px;filter:invert(1)"></div>`;
+      achGridHtml += `<div title="${ach.name} — ${bonusPct}% income boost" class="ach-cell earned"><img src="${ach.icon}" class="ach-img"></div>`;
     } else {
-      achGridHtml += `<div title="${ach.name} — ${bonusPct}% income boost" style="width:32px;height:32px;border:1px solid #555;border-radius:4px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.03);opacity:0.4"><img src="${ach.icon}" style="width:20px;height:20px;filter:invert(1)"></div>`;
+      achGridHtml += `<div title="${ach.name} — ${bonusPct}% income boost" class="ach-cell"><img src="${ach.icon}" class="ach-img"></div>`;
     }
   }
   achSection.innerHTML = `
-    <h3 style="color: #ffd700; font-size: 14px; margin-bottom: 8px;">
+    <h3 style="color: #ffd700; font-size: clamp(11px, 1.8vh, 14px); margin-bottom: 6px;">
       <img src="icons/trophy.svg" style="width:16px;height:16px;vertical-align:middle;filter:invert(1)"> Achievements (${accountAchievements.size}/${CONFIG.achievementSigns.length})
     </h3>
-    <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+    <div class="ach-grid">
       ${achGridHtml}
     </div>
-    <p style="color: #aaa; font-size: 11px; margin-top: 6px;">
+    <p style="color: #aaa; font-size: 11px; margin-top: 4px;">
       Achievements boost income across all cities
     </p>
   `;
@@ -3520,8 +3574,13 @@ function showSettings() {
 
   const panel = document.createElement('div');
   panel.className = 'settings-panel';
-  panel.innerHTML = '<p>Audio and graphics settings coming soon.</p>';
+  panel.style.cssText = 'text-align: left; padding: 12px 0;';
   startButtons.appendChild(panel);
+
+  // Sound toggle
+  panel.appendChild(createSettingsToggle('Sound Effects', !isMuted(), (on) => {
+    setMuted(!on);
+  }));
 
   const backBtn = document.createElement('button');
   backBtn.className = 'back-btn';
@@ -3530,25 +3589,64 @@ function showSettings() {
   startButtons.appendChild(backBtn);
 }
 
+function createSettingsToggle(label: string, initialOn: boolean, onChange: (on: boolean) => void): HTMLElement {
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:10px 4px; border-bottom:1px solid rgba(255,255,255,0.08);';
+
+  const labelEl = document.createElement('span');
+  labelEl.style.cssText = 'color:#ddd; font-size:14px;';
+  labelEl.textContent = label;
+  row.appendChild(labelEl);
+
+  const toggle = document.createElement('button');
+  let isOn = initialOn;
+  const updateToggle = () => {
+    toggle.style.cssText = `
+      width:44px; height:24px; border-radius:12px; border:none; cursor:pointer;
+      position:relative; transition:background 0.2s;
+      background: ${isOn ? '#4a9' : '#444'};
+    `;
+    toggle.innerHTML = `<span style="
+      position:absolute; top:3px; ${isOn ? 'left:23px' : 'left:3px'};
+      width:18px; height:18px; border-radius:50%; background:#fff; transition:left 0.2s;
+    "></span>`;
+  };
+  updateToggle();
+
+  toggle.addEventListener('click', () => {
+    isOn = !isOn;
+    updateToggle();
+    onChange(isOn);
+  });
+  row.appendChild(toggle);
+
+  return row;
+}
+
 function notifyCrazyGamesStart() {
-  try {
-    const cg = (window as any).CrazyGames;
-    if (cg?.SDK) cg.SDK.game?.gameplayStart();
-  } catch {}
+  platform.gameplayStart();
 }
 function notifyCrazyGamesStop() {
-  try {
-    const cg = (window as any).CrazyGames;
-    if (cg?.SDK) cg.SDK.game?.gameplayStop();
-  } catch {}
+  platform.gameplayStop();
+}
+
+function showLoadingOnStartScreen() {
+  startButtons.innerHTML = '';
+  const msg = document.createElement('p');
+  msg.className = 'loading-msg';
+  msg.textContent = 'Loading...';
+  startButtons.appendChild(msg);
 }
 
 async function startNewGame(existingSaves: SaveMeta[]) {
   const usedCities = existingSaves.map(s => s.cityName);
   currentCityName = getRandomCity(usedCities);
-  startScreen.classList.add('hidden');
+  showLoadingOnStartScreen();
+  platform.loadingStart();
   preloadSounds();
   await initGame();
+  platform.loadingStop();
+  startScreen.classList.add('hidden');
   menuBtn.style.display = 'flex';
   notifyCrazyGamesStart();
   // Track city for achievements
@@ -3565,7 +3663,8 @@ async function loadAndStart(cityName: string) {
   try {
     const data: SaveData = JSON.parse(raw);
     currentCityName = cityName;
-    startScreen.classList.add('hidden');
+    showLoadingOnStartScreen();
+    platform.loadingStart();
     preloadSounds();
     await initGame();
     deserializeState(data);
@@ -3582,6 +3681,8 @@ async function loadAndStart(cityName: string) {
     }
     // Rebuild building visually
     await rebuildBuildingFromState();
+    platform.loadingStop();
+    startScreen.classList.add('hidden');
     menuBtn.style.display = 'flex';
     notifyCrazyGamesStart();
     // Track city for achievements
@@ -3653,8 +3754,7 @@ menuSave.addEventListener('click', async () => {
 });
 
 menuSettings.addEventListener('click', () => {
-  // For now just close menu — settings page coming later
-  gameMenu.classList.remove('active');
+  showInGameSettings();
 });
 
 menuQuit.addEventListener('click', async () => {
@@ -3664,6 +3764,38 @@ menuQuit.addEventListener('click', async () => {
   startScreen.classList.remove('hidden');
   showStartScreen();
 });
+
+function showInGameSettings() {
+  const menuPanel = gameMenu.querySelector('.menu-panel')!;
+  const originalHTML = menuPanel.innerHTML;
+
+  menuPanel.innerHTML = '';
+
+  const title = document.createElement('h2');
+  title.textContent = 'Settings';
+  menuPanel.appendChild(title);
+
+  const settingsContent = document.createElement('div');
+  settingsContent.style.cssText = 'width:100%; padding:8px 0;';
+  menuPanel.appendChild(settingsContent);
+
+  settingsContent.appendChild(createSettingsToggle('Sound Effects', !isMuted(), (on) => {
+    setMuted(!on);
+  }));
+
+  const backBtn = document.createElement('button');
+  backBtn.className = 'menu-option';
+  backBtn.textContent = '\u2190 Back';
+  backBtn.addEventListener('click', () => {
+    menuPanel.innerHTML = originalHTML;
+    // Re-bind menu event listeners
+    document.getElementById('menu-resume')!.addEventListener('click', () => gameMenu.classList.remove('active'));
+    document.getElementById('menu-save')!.addEventListener('click', async () => { await autoSave(); showSaveNotification(); gameMenu.classList.remove('active'); });
+    document.getElementById('menu-settings')!.addEventListener('click', () => showInGameSettings());
+    document.getElementById('menu-quit')!.addEventListener('click', async () => { await autoSave(); notifyCrazyGamesStop(); gameMenu.classList.remove('active'); startScreen.classList.remove('hidden'); showStartScreen(); });
+  });
+  menuPanel.appendChild(backBtn);
+}
 
 function showSaveNotification() {
   const n = document.createElement('div');
