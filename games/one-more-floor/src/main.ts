@@ -1,89 +1,103 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { detectPlatform, type GamePlatform } from './platform';
+import { getRandomCity, getCityContinent, ALL_CONTINENTS } from './cities';
+import type { SaveData, SaveMeta } from './save';
+import { loadSaveIndex, updateSaveIndex, removeSaveFromIndex, loadAccountData, saveAccountData } from './save';
+import { playCashSound, playClickSound, playUpgradeSound, playNewFloorSound, playAchievementSound, playTenantSound, playStudioSound, playEventSound, playThunderSound, startRainAmbience, stopRainAmbience, setMuted, isMuted, preloadSounds } from './audio';
+
+let platform: GamePlatform;
 
 // ══════════════════════════════════════════════════════════════
 // GAME CONFIG — tweak all balance numbers here
 // ══════════════════════════════════════════════════════════════
 const CONFIG = {
-  // Economy
-  baseRent: 80,               // rent per tenant with no upgrades
-  incomeTickRate: 0.1,      // minimum money increment
+  // Economy — baseRent is THE tuning lever for game speed
+  baseRent: 2,
+  incomeTickRate: 0.1,
 
   // Floors
-  floorBaseCost: 10000,     // first extra floor costs this
-  floorCostScale: 3,      // each floor costs this × more (10k, 72k, 518k, 3.7M...)
-  perFloorCap: 10,          // per-floor UI phase ends here
+  floorBaseCost: 5000,
+  floorCostScale: 3.5,       // each floor 3.5× more expensive
+  perFloorCap: 10,
 
   // Tenants
-  baseFillRate: 0.02,        // base tenants arriving per second (across whole building)
-  baseChurnRate: 0.08,       // base chance per tenant per minute to leave
-  amenityChurnReduction: 0.007, // each installed amenity reduces churn by this much
-  studioBaseCost: 150000,    // base cost of studio conversion
-  studioCostScale: 50,       // each studio level costs 50x more
-  maxStudioLevel: 4,         // max studio upgrades per floor
+  baseFillRate: 0.03,
+  baseChurnRate: 0.06,
+  amenityChurnReduction: 0.008,
+  studioBaseCost: 150000,
+  studioCostScale: 5,         // each studio level 5× the previous
+  maxStudioLevel: 4,
 
-  // Ads (temporary boost, click-heavy)
-  adCost: 5,                 // flat cost per click
-  adBoostPerClick: 0.08,     // each click adds this to fill rate
-  adBoostMaxDuration: 30,    // timer caps at 30s, doesn't stack beyond
-  adMaxBoost: 2.0,           // max fill rate bonus from ads
-  adDecayRate: 0.015,        // boost decays slowly so clicks feel impactful
+  // Hire Agents
+  adCost: 5,
+  adBoostPerClick: 0.08,
+  adBoostMaxDuration: 30,
+  adMaxBoost: 2.0,
+  adDecayRate: 0.015,
 
-  // Amenities (per-floor upgrades)
+  // Per-floor amenities — cost = baseCost × floorCostScale^floor × apartments
   amenities: [
-    { id: 'hotwater', name: 'Hot Water', icon: '🚿', rentBonus: 3.3,  baseCost: 4,    costScale: 1.35, unlockFloors: 1 },
-    { id: 'heating',  name: 'Heating',   icon: '🔥', rentBonus: 5.5,  baseCost: 12,   costScale: 1.40, unlockFloors: 1 },
-    { id: 'ac',       name: 'AC',        icon: '❄️', rentBonus: 8.8,  baseCost: 35,   costScale: 1.45, unlockFloors: 1 },
-    { id: 'balcony',  name: 'Balcony',   icon: '🌿', rentBonus: 13.2, baseCost: 400,  costScale: 1.50, unlockFloors: 1 },
-    { id: 'laundry',  name: 'Laundry',   icon: '👕', rentBonus: 11,   baseCost: 1000, costScale: 1.50, unlockFloors: 1 },
-    { id: 'gym',      name: 'Gym',       icon: '💪', rentBonus: 19.8, baseCost: 2500, costScale: 1.55, unlockFloors: 1 },
+    { id: 'hotwater', name: 'Hot Water', icon: '🚿', rentBonus: 1,  baseCost: 2,   costScale: 1.0, unlockFloors: 1 },
+    { id: 'heating',  name: 'Heating',   icon: '🔥', rentBonus: 2,  baseCost: 6,   costScale: 1.0, unlockFloors: 1 },
+    { id: 'ac',       name: 'AC',        icon: '❄️', rentBonus: 4,  baseCost: 20,  costScale: 1.0, unlockFloors: 1 },
+    { id: 'balcony',  name: 'Balcony',   icon: '🌿', rentBonus: 6,  baseCost: 60,  costScale: 1.0, unlockFloors: 1 },
+    { id: 'laundry',  name: 'Laundry',   icon: '👕', rentBonus: 5,  baseCost: 150, costScale: 1.0, unlockFloors: 1 },
+    { id: 'gym',      name: 'Gym',       icon: '💪', rentBonus: 8,  baseCost: 400, costScale: 1.0, unlockFloors: 1 },
   ],
 
-  // Neighborhood upgrades
-  // incomeMultiplier: each purchase multiplies TOTAL income by (1 + this)
-  // rentBonusPerFloor: flat bonus added to each floor's rent
+  // Neighborhood upgrades — flat rent bonus per tenant + own cost curve
+  // No incomeMultiplier (achievements handle that). Business income scales with totalTenants.
   neighborhood: [
-    { id: 'sidewalk',    name: 'Sidewalk',       icon: '🚶', rentBonusPerFloor: 5,    incomeMultiplier: 0.15, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 5000, costScale: 1.00, maxCount: 1,   unlockFloors: 1,  fillRateBonus: 0 },
-    { id: 'streetlight', name: 'Streetlight',   icon: '💡', rentBonusPerFloor: 0.5,  incomeMultiplier: 0.005, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 200,  costScale: 2.0,  maxCount: 20,  unlockFloors: 1,  fillRateBonus: 0 },
-    { id: 'tree',        name: 'Tree',          icon: '🌳', rentBonusPerFloor: 0.3,  incomeMultiplier: 0.003, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 100,  costScale: 1.9,  maxCount: 15,  unlockFloors: 1,  fillRateBonus: 0 },
-    { id: 'bench',       name: 'Park Bench',    icon: '🪑', rentBonusPerFloor: 0.2,  incomeMultiplier: 0.005,ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 500,  costScale: 2.1,  maxCount: 10,  unlockFloors: 3,  fillRateBonus: 0 },
-    { id: 'parking',     name: 'Parking Space', icon: '🅿️', rentBonusPerFloor: 0.8,  incomeMultiplier: 0.008, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 2000, costScale: 2.2,  maxCount: 15,  unlockFloors: 5,  fillRateBonus: 0 },
-    { id: 'cafe',        name: 'Café',          icon: '☕', rentBonusPerFloor: 1.0,  incomeMultiplier: 0.02, ownIncome: 100,  ownIncomeFloorScale: 2.0, baseCost: 1000, costScale: 1.45, maxCount: 1,   unlockFloors: 8,  fillRateBonus: 0 },
-    { id: 'restaurant', name: 'Restaurant',    icon: '🍽️', rentBonusPerFloor: 2.0,  incomeMultiplier: 0.03, ownIncome: 500,  ownIncomeFloorScale: 5.0, baseCost: 50000, costScale: 1.50, maxCount: 1,  unlockFloors: 10, fillRateBonus: 0 },
-    { id: 'salon',      name: 'Hair Salon',    icon: '💇', rentBonusPerFloor: 1.5,  incomeMultiplier: 0.02, ownIncome: 200,  ownIncomeFloorScale: 3.0, baseCost: 20000, costScale: 1.45, maxCount: 1,  unlockFloors: 7,  fillRateBonus: 0.05 },
-    { id: 'spa',        name: 'Luxury Spa',    icon: '🧖', rentBonusPerFloor: 3.0,  incomeMultiplier: 0.04, ownIncome: 2000, ownIncomeFloorScale: 10.0, baseCost: 200000, costScale: 1.55, maxCount: 1, unlockFloors: 14, fillRateBonus: 0 },
-    { id: 'fountain',    name: 'Fountain',      icon: '⛲', rentBonusPerFloor: 1.5,  incomeMultiplier: 0.01, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 8000, costScale: 2.5,  maxCount: 8,   unlockFloors: 6,  fillRateBonus: 0 },
-    { id: 'playground',  name: 'Playground',    icon: '🎠', rentBonusPerFloor: 1.0,  incomeMultiplier: 0.008, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 3000, costScale: 2.3,  maxCount: 8,   unlockFloors: 4,  fillRateBonus: 0 },
-    // Fill rate upgrades — get to ~1.2/s by floor 5-6
-    { id: 'billboard',   name: 'Billboard',     icon: '📋', rentBonusPerFloor: 0,    incomeMultiplier: 0,    ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 300,  costScale: 2.0,  maxCount: 10,  unlockFloors: 2,  fillRateBonus: 0.03 },
-    { id: 'busstop',     name: 'Bus Stop',      icon: '🚌', rentBonusPerFloor: 0.1,  incomeMultiplier: 0,    ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 2000, costScale: 2.5,  maxCount: 8,   unlockFloors: 3,  fillRateBonus: 0.06 },
-    { id: 'metrostation',name: 'Metro Station', icon: '🚇', rentBonusPerFloor: 0.5,  incomeMultiplier: 0.02, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 25000,costScale: 3.0,  maxCount: 5,   unlockFloors: 5,  fillRateBonus: 0.12 },
+    { id: 'sidewalk',    name: 'Sidewalk',       icon: '🚶', rentBonusPerTenant: 1,    ownIncome: 0,    baseCost: 500,    costScale: 1.0,  maxCount: 1,   unlockFloors: 1,  fillRateBonus: 0 },
+    { id: 'streetlight', name: 'Streetlight',    icon: '💡', rentBonusPerTenant: 0.3,  ownIncome: 0,    baseCost: 100,    costScale: 1.8,  maxCount: 20,  unlockFloors: 1,  fillRateBonus: 0 },
+    { id: 'tree',        name: 'Tree',           icon: '🌳', rentBonusPerTenant: 0.2,  ownIncome: 0,    baseCost: 50,     costScale: 1.8,  maxCount: 15,  unlockFloors: 1,  fillRateBonus: 0 },
+    { id: 'bench',       name: 'Park Bench',     icon: '🪑', rentBonusPerTenant: 0.3,  ownIncome: 0,    baseCost: 300,    costScale: 2.0,  maxCount: 10,  unlockFloors: 3,  fillRateBonus: 0 },
+    { id: 'playground',  name: 'Playground',     icon: '🎠', rentBonusPerTenant: 0.5,  ownIncome: 0,    baseCost: 2000,   costScale: 2.5,  maxCount: 8,   unlockFloors: 4,  fillRateBonus: 0 },
+    { id: 'parking',     name: 'Parking Space',  icon: '🅿️', rentBonusPerTenant: 0.5,  ownIncome: 0,    baseCost: 5000,   costScale: 2.5,  maxCount: 10,  unlockFloors: 5,  fillRateBonus: 0 },
+    { id: 'fountain',    name: 'Fountain',       icon: '⛲', rentBonusPerTenant: 1,    ownIncome: 0,    baseCost: 10000,  costScale: 3.0,  maxCount: 5,   unlockFloors: 6,  fillRateBonus: 0 },
+    { id: 'billboard',   name: 'Billboard',      icon: '📋', rentBonusPerTenant: 0,    ownIncome: 0,    baseCost: 200,    costScale: 2.0,  maxCount: 10,  unlockFloors: 2,  fillRateBonus: 0.02 },
+    { id: 'busstop',     name: 'Bus Stop',       icon: '🚌', rentBonusPerTenant: 0.1,  ownIncome: 0,    baseCost: 1000,   costScale: 2.5,  maxCount: 8,   unlockFloors: 3,  fillRateBonus: 0.05 },
+    { id: 'metrostation',name: 'Metro Station',  icon: '🚇', rentBonusPerTenant: 0.5,  ownIncome: 0,    baseCost: 15000,  costScale: 3.0,  maxCount: 5,   unlockFloors: 5,  fillRateBonus: 0.10 },
+    { id: 'salon',       name: 'Hair Salon',     icon: '💇', rentBonusPerTenant: 1.5,  ownIncome: 200,  baseCost: 30000,  costScale: 1.0,  maxCount: 1,   unlockFloors: 7,  fillRateBonus: 0.05 },
+    { id: 'cafe',        name: 'Café',           icon: '☕', rentBonusPerTenant: 1,    ownIncome: 100,  baseCost: 50000,  costScale: 1.0,  maxCount: 1,   unlockFloors: 8,  fillRateBonus: 0 },
+    { id: 'restaurant',  name: 'Restaurant',     icon: '🍽️', rentBonusPerTenant: 2,    ownIncome: 500,  baseCost: 500000, costScale: 1.0,  maxCount: 1,   unlockFloors: 10, fillRateBonus: 0 },
+    { id: 'spa',         name: 'Luxury Spa',     icon: '🧖', rentBonusPerTenant: 3,    ownIncome: 2000, baseCost: 5000000,costScale: 1.0,  maxCount: 1,   unlockFloors: 14, fillRateBonus: 0 },
+    { id: 'golf_course', name: 'Golf Course',    icon: '⛳', rentBonusPerTenant: 80,   ownIncome: 0,    baseCost: 5e15,   costScale: 5.0,  maxCount: 8,   unlockFloors: 14, fillRateBonus: 0.2 },
+    { id: 'heliport',    name: 'Heliport',       icon: '🚁', rentBonusPerTenant: 50,   ownIncome: 0,    baseCost: 1e15,   costScale: 5.0,  maxCount: 10,  unlockFloors: 15, fillRateBonus: 0.5 },
+    { id: 'yacht_club',  name: 'Yacht Club',     icon: '⛵', rentBonusPerTenant: 100,  ownIncome: 0,    baseCost: 10e15,  costScale: 6.0,  maxCount: 8,   unlockFloors: 16, fillRateBonus: 0.3 },
+    { id: 'private_airport', name: 'Private Airport', icon: '✈️', rentBonusPerTenant: 200, ownIncome: 0, baseCost: 50e15, costScale: 8.0, maxCount: 5, unlockFloors: 18, fillRateBonus: 1.0 },
+    { id: 'shopping_mall', name: 'Shopping Mall', icon: '🏬', rentBonusPerTenant: 300,  ownIncome: 0,    baseCost: 100e15, costScale: 8.0,  maxCount: 5,   unlockFloors: 20, fillRateBonus: 2.0 },
+    { id: 'theme_park',  name: 'Theme Park',     icon: '🎢', rentBonusPerTenant: 500,  ownIncome: 0,    baseCost: 500e15, costScale: 10.0, maxCount: 3,   unlockFloors: 22, fillRateBonus: 3.0 },
+    { id: 'space_elevator', name: 'Space Elevator', icon: '🛸', rentBonusPerTenant: 1000, ownIncome: 0, baseCost: 10e18, costScale: 15.0, maxCount: 3, unlockFloors: 25, fillRateBonus: 5.0 },
+    { id: 'quantum_lab', name: 'Quantum Lab',    icon: '⚛️', rentBonusPerTenant: 2000, ownIncome: 0,    baseCost: 50e18,  costScale: 12.0, maxCount: 3,   unlockFloors: 28, fillRateBonus: 8.0 },
+    { id: 'dyson_sphere', name: 'Dyson Sphere',  icon: '☀️', rentBonusPerTenant: 5000, ownIncome: 0,    baseCost: 500e18, costScale: 20.0, maxCount: 1,   unlockFloors: 30, fillRateBonus: 20.0 },
   ],
 
   // Business sub-upgrades (per business type)
   businessUpgrades: {
     cafe: [
-      { id: 'menu', name: 'Better Menu', icon: '📋', incomeBoost: 1.0, baseCost: 300, costScale: 1.8, maxLevel: 20 },
-      { id: 'seating', name: 'More Seating', icon: '💺', incomeBoost: 0.8, baseCost: 500, costScale: 1.7, maxLevel: 20 },
-      { id: 'barista', name: 'Expert Barista', icon: '👨‍🍳', incomeBoost: 1.5, baseCost: 2000, costScale: 2.0, maxLevel: 15 },
-      { id: 'franchise', name: 'Franchise License', icon: '🏪', incomeBoost: 5.0, baseCost: 50000, costScale: 2.5, maxLevel: 5 },
+      { id: 'menu', name: 'Better Menu', icon: '📋', incomeBoost: 1.0, baseCost: 3000, costScale: 2.5, maxLevel: 20 },
+      { id: 'seating', name: 'More Seating', icon: '💺', incomeBoost: 0.8, baseCost: 5000, costScale: 2.4, maxLevel: 20 },
+      { id: 'barista', name: 'Expert Barista', icon: '👨‍🍳', incomeBoost: 1.5, baseCost: 20000, costScale: 2.8, maxLevel: 15 },
+      { id: 'franchise', name: 'Franchise License', icon: '🏪', incomeBoost: 5.0, baseCost: 500000, costScale: 3.5, maxLevel: 5 },
     ],
     restaurant: [
-      { id: 'chef', name: 'Head Chef', icon: '👨‍🍳', incomeBoost: 2.0, baseCost: 10000, costScale: 1.8, maxLevel: 15 },
-      { id: 'winelist', name: 'Wine Selection', icon: '🍷', incomeBoost: 1.5, baseCost: 8000, costScale: 1.7, maxLevel: 20 },
-      { id: 'michelin', name: 'Michelin Star', icon: '⭐', incomeBoost: 10.0, baseCost: 500000, costScale: 3.0, maxLevel: 3 },
-      { id: 'catering', name: 'Catering Service', icon: '🚐', incomeBoost: 3.0, baseCost: 100000, costScale: 2.0, maxLevel: 10 },
+      { id: 'chef', name: 'Head Chef', icon: '👨‍🍳', incomeBoost: 2.0, baseCost: 100000, costScale: 2.5, maxLevel: 15 },
+      { id: 'winelist', name: 'Wine Selection', icon: '🍷', incomeBoost: 1.5, baseCost: 80000, costScale: 2.4, maxLevel: 20 },
+      { id: 'michelin', name: 'Michelin Star', icon: '⭐', incomeBoost: 10.0, baseCost: 5000000, costScale: 4.0, maxLevel: 3 },
+      { id: 'catering', name: 'Catering Service', icon: '🚐', incomeBoost: 3.0, baseCost: 1000000, costScale: 2.8, maxLevel: 10 },
     ],
     salon: [
-      { id: 'stylist', name: 'Star Stylist', icon: '✂️', incomeBoost: 1.5, baseCost: 5000, costScale: 1.8, maxLevel: 15 },
-      { id: 'products', name: 'Premium Products', icon: '💅', incomeBoost: 1.0, baseCost: 3000, costScale: 1.7, maxLevel: 20 },
-      { id: 'vip', name: 'VIP Treatments', icon: '💎', incomeBoost: 4.0, baseCost: 50000, costScale: 2.2, maxLevel: 8 },
+      { id: 'stylist', name: 'Star Stylist', icon: '✂️', incomeBoost: 1.5, baseCost: 50000, costScale: 2.5, maxLevel: 15 },
+      { id: 'products', name: 'Premium Products', icon: '💅', incomeBoost: 1.0, baseCost: 30000, costScale: 2.4, maxLevel: 20 },
+      { id: 'vip', name: 'VIP Treatments', icon: '💎', incomeBoost: 4.0, baseCost: 500000, costScale: 3.0, maxLevel: 8 },
     ],
     spa: [
-      { id: 'massage', name: 'Massage Therapy', icon: '💆', incomeBoost: 2.0, baseCost: 50000, costScale: 1.8, maxLevel: 15 },
-      { id: 'sauna', name: 'Sauna Suite', icon: '🧖', incomeBoost: 2.5, baseCost: 80000, costScale: 1.9, maxLevel: 10 },
-      { id: 'retreat', name: 'Wellness Retreat', icon: '🌿', incomeBoost: 8.0, baseCost: 500000, costScale: 2.5, maxLevel: 5 },
-      { id: 'celebrity_spa', name: 'Celebrity Package', icon: '🌟', incomeBoost: 15.0, baseCost: 5000000, costScale: 3.0, maxLevel: 3 },
+      { id: 'massage', name: 'Massage Therapy', icon: '💆', incomeBoost: 2.0, baseCost: 500000, costScale: 2.5, maxLevel: 15 },
+      { id: 'sauna', name: 'Sauna Suite', icon: '🧖', incomeBoost: 2.5, baseCost: 800000, costScale: 2.8, maxLevel: 10 },
+      { id: 'retreat', name: 'Wellness Retreat', icon: '🌿', incomeBoost: 8.0, baseCost: 5000000, costScale: 3.5, maxLevel: 5 },
+      { id: 'celebrity_spa', name: 'Celebrity Package', icon: '🌟', incomeBoost: 15.0, baseCost: 50000000, costScale: 4.0, maxLevel: 3 },
     ],
   } as Record<string, { id: string; name: string; icon: string; incomeBoost: number; baseCost: number; costScale: number; maxLevel: number }[]>,
 
@@ -104,21 +118,69 @@ const CONFIG = {
 
   // Achievement yard signs
   achievementSigns: [
-    { id: 'first_floor', name: 'First Floor!', trigger: 'floors' as const, value: 2, icon: '🏠' },
-    { id: 'five_floors', name: '5 Stories High', trigger: 'floors' as const, value: 5, icon: '🏢' },
-    { id: 'ten_floors', name: 'Skyscraper', trigger: 'floors' as const, value: 10, icon: '🏙️' },
-    { id: 'twenty_floors', name: 'To The Clouds', trigger: 'floors' as const, value: 20, icon: '☁️' },
-    { id: 'fifty_floors', name: 'Space Elevator', trigger: 'floors' as const, value: 50, icon: '🚀' },
-    { id: 'first_tenant', name: 'First Tenant', trigger: 'tenants' as const, value: 5, icon: '👤' },
-    { id: 'hundred_tenants', name: '100 Tenants', trigger: 'tenants' as const, value: 100, icon: '👥' },
-    { id: 'thousand_tenants', name: '1000 Tenants', trigger: 'tenants' as const, value: 1000, icon: '🏘️' },
-    { id: 'first_studio', name: 'Studio Upgrade', trigger: 'studios' as const, value: 1, icon: '🔨' },
-    { id: 'first_million', name: 'Millionaire', trigger: 'money_earned' as const, value: 1e6, icon: '💰' },
-    { id: 'first_billion', name: 'Billionaire', trigger: 'money_earned' as const, value: 1e9, icon: '💎' },
-    { id: 'first_trillion', name: 'Trillionaire', trigger: 'money_earned' as const, value: 1e12, icon: '👑' },
-    { id: 'first_event', name: 'Weathered', trigger: 'events' as const, value: 1, icon: '🌤️' },
-    { id: 'full_building', name: 'No Vacancy', trigger: 'occupancy_full' as const, value: 1, icon: '🔑' },
-    { id: 'first_penthouse', name: 'Luxury Living', trigger: 'penthouses' as const, value: 1, icon: '🥂' },
+    // Tenant milestones
+    { id: 'first_tenant', name: 'First Tenant', icon: 'icons/id-card.svg', bonus: 1.05, trigger: 'tenants' as const, value: 1 },
+    { id: 'ten_tenants', name: '10 Tenants', icon: 'icons/id-card.svg', bonus: 1.05, trigger: 'tenants' as const, value: 10 },
+    { id: 'fifty_tenants', name: '50 Tenants', icon: 'icons/sprint.svg', bonus: 1.08, trigger: 'tenants' as const, value: 50 },
+    { id: 'hundred_tenants', name: '100 Tenants', icon: 'icons/sprint.svg', bonus: 1.10, trigger: 'tenants' as const, value: 100 },
+    { id: 'five_hundred_tenants', name: '500 Tenants', icon: 'icons/star-formation.svg', bonus: 1.15, trigger: 'tenants' as const, value: 500 },
+    { id: 'thousand_tenants', name: '1000 Tenants', icon: 'icons/modern-city.svg', bonus: 1.20, trigger: 'tenants' as const, value: 1000 },
+    { id: 'five_k_tenants', name: '5000 Tenants', icon: 'icons/modern-city.svg', bonus: 1.25, trigger: 'tenants' as const, value: 5000 },
+    { id: 'ten_k_tenants', name: '10K Tenants', icon: 'icons/star-formation.svg', bonus: 1.30, trigger: 'tenants' as const, value: 10000 },
+    { id: 'fifty_k_tenants', name: '50K Tenants', icon: 'icons/star-formation.svg', bonus: 1.40, trigger: 'tenants' as const, value: 50000 },
+    { id: 'hundred_k_tenants', name: '100K Tenants', icon: 'icons/sprint.svg', bonus: 1.50, trigger: 'tenants' as const, value: 100000 },
+
+    // Floor milestones
+    { id: 'first_floor', name: 'First Floor', icon: 'icons/family-house.svg', bonus: 1.05, trigger: 'floors' as const, value: 2 },
+    { id: 'five_floors', name: '5 Stories', icon: 'icons/upgrade.svg', bonus: 1.08, trigger: 'floors' as const, value: 5 },
+    { id: 'ten_floors', name: '10 Stories', icon: 'icons/upgrade.svg', bonus: 1.10, trigger: 'floors' as const, value: 10 },
+    { id: 'twenty_floors', name: 'Skyscraper', icon: 'icons/modern-city.svg', bonus: 1.15, trigger: 'floors' as const, value: 20 },
+    { id: 'thirty_floors', name: '30 Stories', icon: 'icons/modern-city.svg', bonus: 1.15, trigger: 'floors' as const, value: 30 },
+    { id: 'fifty_floors', name: 'Mega Tower', icon: 'icons/modern-city.svg', bonus: 1.20, trigger: 'floors' as const, value: 50 },
+    { id: 'hundred_floors', name: 'Arcology', icon: 'icons/modern-city.svg', bonus: 1.30, trigger: 'floors' as const, value: 100 },
+
+    // Money milestones
+    { id: 'first_million', name: 'Millionaire', icon: 'icons/two-coins.svg', bonus: 1.10, trigger: 'money_earned' as const, value: 1e6 },
+    { id: 'first_billion', name: 'Billionaire', icon: 'icons/money-stack.svg', bonus: 1.15, trigger: 'money_earned' as const, value: 1e9 },
+    { id: 'first_trillion', name: 'Trillionaire', icon: 'icons/cash.svg', bonus: 1.20, trigger: 'money_earned' as const, value: 1e12 },
+    { id: 'quadrillionaire', name: 'Quadrillionaire', icon: 'icons/gold-mine.svg', bonus: 1.25, trigger: 'money_earned' as const, value: 1e15 },
+    { id: 'quintillionaire', name: 'Quintillionaire', icon: 'icons/gold-mine.svg', bonus: 1.30, trigger: 'money_earned' as const, value: 1e18 },
+    { id: 'sextillionaire', name: 'Sextillionaire', icon: 'icons/cash.svg', bonus: 1.35, trigger: 'money_earned' as const, value: 1e21 },
+    { id: 'septillionaire', name: 'Septillionaire', icon: 'icons/money-stack.svg', bonus: 1.40, trigger: 'money_earned' as const, value: 1e24 },
+    { id: 'beyond_money', name: 'Beyond Money', icon: 'icons/laurel-crown.svg', bonus: 2.00, trigger: 'money_earned' as const, value: 1e30 },
+
+    // Studio milestones
+    { id: 'first_studio', name: 'Studio Upgrade', icon: 'icons/hammer-drop.svg', bonus: 1.08, trigger: 'studios' as const, value: 1 },
+    { id: 'five_studios', name: 'Renovation King', icon: 'icons/skills.svg', bonus: 1.10, trigger: 'studios' as const, value: 5 },
+    { id: 'twenty_studios', name: 'Master Builder', icon: 'icons/hammer-drop.svg', bonus: 1.15, trigger: 'studios' as const, value: 20 },
+
+    // Event milestones
+    { id: 'first_event', name: 'Weather Watcher', icon: 'icons/sun.svg', bonus: 1.05, trigger: 'events' as const, value: 1 },
+    { id: 'ten_events', name: 'Event Veteran', icon: 'icons/tornado.svg', bonus: 1.10, trigger: 'events' as const, value: 10 },
+    { id: 'fifty_events', name: 'Storm Chaser', icon: 'icons/tornado.svg', bonus: 1.15, trigger: 'events' as const, value: 50 },
+
+    // Special
+    { id: 'full_house', name: 'No Vacancy', icon: 'icons/crowned-heart.svg', bonus: 1.10, trigger: 'occupancy_full' as const, value: 0 },
+    { id: 'penthouse', name: 'Penthouse Suite', icon: 'icons/trophy.svg', bonus: 1.20, trigger: 'penthouses' as const, value: 0 },
+    { id: 'five_penthouses', name: 'Luxury Empire', icon: 'icons/laurel-crown.svg', bonus: 1.25, trigger: 'penthouses_count' as const, value: 5 },
+
+    // City / Travel milestones
+    { id: 'first_city', name: 'First City', icon: 'icons/family-house.svg', bonus: 1.05, trigger: 'cities_played' as const, value: 1 },
+    { id: 'three_cities', name: 'Frequent Flyer', icon: 'icons/sprint.svg', bonus: 1.10, trigger: 'cities_played' as const, value: 3 },
+    { id: 'five_cities', name: 'Jet Setter', icon: 'icons/sprint.svg', bonus: 1.15, trigger: 'cities_played' as const, value: 5 },
+    { id: 'ten_cities', name: 'World Traveler', icon: 'icons/modern-city.svg', bonus: 1.20, trigger: 'cities_played' as const, value: 10 },
+    { id: 'twenty_cities', name: 'Globetrotter', icon: 'icons/modern-city.svg', bonus: 1.30, trigger: 'cities_played' as const, value: 20 },
+
+    // Continent milestones
+    { id: 'europe', name: 'European Tycoon', icon: 'icons/star-formation.svg', bonus: 1.15, trigger: 'continent' as const, value: 0, continent: 'Europe' },
+    { id: 'asia', name: 'Asian Empire', icon: 'icons/star-formation.svg', bonus: 1.15, trigger: 'continent' as const, value: 0, continent: 'Asia' },
+    { id: 'north_america', name: 'American Dream', icon: 'icons/star-formation.svg', bonus: 1.15, trigger: 'continent' as const, value: 0, continent: 'North America' },
+    { id: 'south_america', name: 'South American Mogul', icon: 'icons/star-formation.svg', bonus: 1.15, trigger: 'continent' as const, value: 0, continent: 'South America' },
+    { id: 'africa', name: 'African Pioneer', icon: 'icons/star-formation.svg', bonus: 1.15, trigger: 'continent' as const, value: 0, continent: 'Africa' },
+    { id: 'oceania', name: 'Pacific Islander', icon: 'icons/star-formation.svg', bonus: 1.15, trigger: 'continent' as const, value: 0, continent: 'Oceania' },
+    { id: 'all_continents', name: 'Global Domination', icon: 'icons/laurel-crown.svg', bonus: 2.00, trigger: 'all_continents' as const, value: 0 },
+
+    { id: 'completionist', name: 'Completionist', icon: 'icons/medal.svg', bonus: 1.50, trigger: 'all_achievements' as const, value: 0 },
   ],
 
   // Visuals
@@ -171,10 +233,8 @@ interface NeighborhoodDef {
   icon: string;
   description: string;
   model: string | null;
-  rentBonusPerFloor: number;
-  incomeMultiplier: number; // each purchase multiplies total income by (1 + this)
+  rentBonusPerTenant: number;
   ownIncome: number;
-  ownIncomeFloorScale: number;
   baseCost: number;
   costScale: number;
   maxCount: number;
@@ -247,7 +307,6 @@ interface GameState {
   adClicks: number;       // total clicks (for display)
   activeEvent: { event: CityEvent; timeLeft: number } | null;
   eventCooldown: number;  // seconds until next event
-  earnedAchievements: Set<string>;
   totalMoneyEarned: number;
   totalStudios: number;
   totalEvents: number;
@@ -266,6 +325,11 @@ const PROP_MGMT_LEVELS = [
   { name: 'Real Estate Empire',    cost: 500e12, multiplier: 50,   icon: '🌆' },
   { name: 'Global Holdings Corp',  cost: 10e15,  multiplier: 200,  icon: '🌍' },
   { name: 'Galactic Properties',   cost: 500e15, multiplier: 1000, icon: '🚀' },
+  { name: 'Quantum Real Estate',   cost: 50e18,  multiplier: 5000, icon: '⚛️' },
+  { name: 'Dimensional Holdings',  cost: 5e21,   multiplier: 25000, icon: '🌌' },
+  { name: 'Multiverse Realty',     cost: 500e21, multiplier: 100000, icon: '🔮' },
+  { name: 'Omniscient Properties', cost: 50e24,  multiplier: 500000, icon: '👁️' },
+  { name: 'God-Tier Holdings',     cost: 5e27,   multiplier: 5000000, icon: '⚡' },
 ];
 
 let propMgmtLevel = 0; // 0 = not purchased, 1+ = current level
@@ -296,11 +360,108 @@ const state: GameState = {
   adClicks: 0,
   activeEvent: null,
   eventCooldown: 30,
-  earnedAchievements: new Set(),
   totalMoneyEarned: 0,
   totalStudios: 0,
   totalEvents: 0,
 };
+
+let accountAchievements: Set<string> = new Set();
+let citiesPlayed: Set<string> = new Set();
+
+// ── Save/Load Serialization ──────────────────────────────────
+function serializeState(cityName: string): SaveData {
+  return {
+    version: 1,
+    cityName,
+    timestamp: Date.now(),
+    money: state.money,
+    totalMoneyEarned: state.totalMoneyEarned,
+    floorCount: state.floorCount,
+    floorStates: state.floorStates.map(f => ({
+      tenants: f.tenants,
+      maxTenants: f.maxTenants,
+      studioLevel: f.studioLevel,
+      isPenthouse: f.isPenthouse,
+      amenityInstalls: Object.fromEntries(f.amenityInstalls),
+      penthouseAmenityInstalls: Object.fromEntries(f.penthouseAmenityInstalls),
+    })),
+    neighborhoodCounts: Object.fromEntries(neighborhoodUpgrades.map(n => [n.id, n.count])),
+    businessUpgradeLevels: Object.fromEntries(
+      Object.entries(businessUpgradeState).map(([bizId, levels]) => [
+        bizId,
+        Object.fromEntries(levels.map(l => [l.id, l.level])),
+      ])
+    ),
+    propMgmtLevel,
+    totalStudios: state.totalStudios,
+    totalEvents: state.totalEvents,
+    adClicks: state.adClicks,
+    incomePerSecond: getTotalRentPerSecond(),
+    lastSaveTime: Date.now(),
+  };
+}
+
+function deserializeState(data: SaveData): void {
+  state.money = data.money;
+  state.totalMoneyEarned = data.totalMoneyEarned ?? 0;
+  state.floorCount = data.floorCount;
+  state.adBoost = 0;
+  state.adTimer = 0;
+  state.adClicks = data.adClicks ?? 0;
+  state.activeEvent = null;
+  state.eventCooldown = 120;
+  state.totalStudios = data.totalStudios ?? 0;
+  state.totalEvents = data.totalEvents ?? 0;
+
+  // Restore floor states
+  state.floorStates = data.floorStates.map(f => ({
+    amenityInstalls: new Map(Object.entries(f.amenityInstalls).map(([k, v]) => [k, Number(v)])),
+    tenants: f.tenants,
+    maxTenants: f.maxTenants,
+    studioLevel: f.studioLevel,
+    hasPenthouse: f.isPenthouse,
+    isPenthouse: f.isPenthouse,
+    penthouseAmenityInstalls: new Map(Object.entries(f.penthouseAmenityInstalls || {}).map(([k, v]) => [k, Number(v)])),
+  }));
+
+  // Restore neighborhood counts
+  for (const n of neighborhoodUpgrades) {
+    n.count = data.neighborhoodCounts?.[n.id] ?? 0;
+  }
+
+  // Restore business upgrade levels
+  for (const [bizId, levels] of Object.entries(data.businessUpgradeLevels ?? {})) {
+    if (businessUpgradeState[bizId]) {
+      for (const st of businessUpgradeState[bizId]) {
+        st.level = (levels as Record<string, number>)[st.id] ?? 0;
+      }
+    }
+  }
+
+  // Restore amenity totalInstalled counts
+  for (const a of amenities) {
+    a.totalInstalled = 0;
+    for (const f of state.floorStates) {
+      a.totalInstalled += f.amenityInstalls.get(a.id) ?? 0;
+    }
+  }
+
+  propMgmtLevel = data.propMgmtLevel ?? 0;
+  peakMoney = state.money;
+
+  // Migrate old per-city achievements to account
+  if (data.earnedAchievements) {
+    for (const id of data.earnedAchievements) {
+      accountAchievements.add(id);
+    }
+    saveAccountData(platform, { earnedAchievements: [...accountAchievements] });
+  }
+
+  // Sync achievements from account data
+  for (const a of achievements) {
+    a.unlocked = accountAchievements.has(a.id);
+  }
+}
 
 function getEventCostMultiplier(): number {
   if (state.activeEvent && state.activeEvent.event.costDiscount) {
@@ -390,6 +551,15 @@ const HOOD_VISUALS: Record<string, { description: string; model: string | null; 
   billboard: { description: 'Attracts tenants', model: null, positions: [] },
   busstop: { description: 'Public transit access', model: null, positions: [] },
   metrostation: { description: 'Major transit hub', model: null, positions: [] },
+  heliport: { description: 'VIP helicopter access', model: null, positions: [] },
+  private_airport: { description: 'Private jet terminal', model: null, positions: [] },
+  yacht_club: { description: 'Luxury marina', model: null, positions: [] },
+  golf_course: { description: 'Championship greens', model: null, positions: [] },
+  shopping_mall: { description: 'Mega retail complex', model: null, positions: [] },
+  theme_park: { description: 'World-class entertainment', model: null, positions: [] },
+  space_elevator: { description: 'Orbital access point', model: null, positions: [] },
+  quantum_lab: { description: 'Reality-bending research', model: null, positions: [] },
+  dyson_sphere: { description: 'Harness a star', model: null, positions: [] },
 };
 
 // Build neighborhood upgrades by merging CONFIG balance with visuals
@@ -410,20 +580,14 @@ const neighborhoodModels: THREE.Object3D[] = []; // spawned 3D models
 function getNeighborhoodRentBonus(): number {
   let bonus = 0;
   for (const n of neighborhoodUpgrades) {
-    bonus += n.rentBonusPerFloor * n.count;
+    bonus += n.rentBonusPerTenant * n.count;
   }
   return bonus;
 }
 
 // Global income multiplier from neighborhood — compounds!
 function getGlobalMultiplier(): number {
-  let mult = 1;
-  for (const n of neighborhoodUpgrades) {
-    if (n.incomeMultiplier > 0 && n.count > 0) {
-      mult *= Math.pow(1 + n.incomeMultiplier, n.count);
-    }
-  }
-  return mult;
+  return 1; // income multiplier removed — achievements + prop mgmt handle this
 }
 
 // Per-business sub-upgrade multiplier
@@ -450,11 +614,11 @@ function getBusinessUpgradeCost(businessId: string, index: number): number {
 
 function getNeighborhoodIncome(): number {
   let income = 0;
+  const tenants = getTotalTenants();
   for (const n of neighborhoodUpgrades) {
     if (n.ownIncome > 0 && n.count > 0) {
-      let bizIncome = n.ownIncome * n.count * (1 + state.floorCount * n.ownIncomeFloorScale);
-      bizIncome *= getBusinessUpgradeMultiplier(n.id);
-      income += bizIncome;
+      const bizMult = getBusinessUpgradeMultiplier(n.id);
+      income += n.ownIncome * n.count * Math.max(1, tenants) * bizMult;
     }
   }
   return income;
@@ -749,29 +913,14 @@ function getAverageRentPerTenant(): number {
 // ── Upgrade Costs ────────────────────────────────────────────
 // Amenity cost tiers as multiplier of floor cost (per apartment)
 // Hot Water = 0.15x, Heating = 0.25x, AC = 0.4x, Balcony = 0.6x, Laundry = 0.8x, Gym = 1.2x
-const AMENITY_FLOOR_COST_RATIO: Record<string, number> = {
-  hotwater: 0.15,
-  heating: 0.25,
-  ac: 0.4,
-  balcony: 0.6,
-  laundry: 0.8,
-  gym: 1.2,
-};
-
+// Amenity cost = baseCost × floorCostScale^floor × apartments × studioMult
 function getAmenityCostPerUnit(a: AmenityDef, floorIndex: number): number {
   const floor = state.floorStates[floorIndex];
-  const studioMultiplier = floor ? Math.pow(5, floor.studioLevel) : 1;
-  if (floorIndex === 0) {
-    // Floor 0: use original cheap baseCosts so early game is playable
-    return Math.floor(a.baseCost * studioMultiplier * getEventCostMultiplier());
-  }
-  // Floor 1+: costs scale as fraction of floor cost, always expensive
-  const floorCost = Math.floor(CONFIG.floorBaseCost * Math.pow(CONFIG.floorCostScale, floorIndex));
-  const ratio = AMENITY_FLOOR_COST_RATIO[a.id] || 0.3;
-  return Math.floor(floorCost * ratio * studioMultiplier * getEventCostMultiplier());
+  const studioMult = floor ? Math.pow(CONFIG.studioCostScale, floor.studioLevel) : 1;
+  const floorMult = Math.pow(CONFIG.floorCostScale, floorIndex);
+  return Math.floor(a.baseCost * floorMult * studioMult * getEventCostMultiplier());
 }
 
-// Total cost to install amenity on all remaining apartments on a floor
 function getAmenityFullCost(a: AmenityDef, floorIndex: number): number {
   const floor = state.floorStates[floorIndex];
   if (!floor) return 0;
@@ -781,9 +930,10 @@ function getAmenityFullCost(a: AmenityDef, floorIndex: number): number {
 }
 
 function getStudioCost(floorIndex: number, studioLevel: number): number {
-  const floorCost = Math.floor(CONFIG.floorBaseCost * Math.pow(CONFIG.floorCostScale, Math.max(0, floorIndex)));
-  const floorScaleFactor = (1 + floorIndex * 0.5);
-  return Math.floor(floorCost * 3 * floorScaleFactor * Math.pow(CONFIG.studioCostScale, studioLevel) * getEventCostMultiplier());
+  // Studio cost = total floor upgrade cost × studioCostScale^(level+1)
+  const floorMult = Math.pow(CONFIG.floorCostScale, floorIndex);
+  const totalFloorUpgradeCost = CONFIG.amenities.reduce((sum, a) => sum + a.baseCost, 0) * 10 * floorMult;
+  return Math.floor(totalFloorUpgradeCost * Math.pow(CONFIG.studioCostScale, studioLevel + 1) * getEventCostMultiplier());
 }
 
 function getPenthouseCost(floorIndex: number): number {
@@ -848,6 +998,12 @@ function getAchievementMultiplier(): number {
   for (const a of achievements) {
     if (a.unlocked) mult *= a.multiplier;
   }
+  // Also apply sign achievement bonuses
+  for (const ach of CONFIG.achievementSigns) {
+    if (accountAchievements.has(ach.id)) {
+      mult *= ach.bonus;
+    }
+  }
   return mult;
 }
 
@@ -855,8 +1011,10 @@ function checkAchievements() {
   for (const a of achievements) {
     if (!a.unlocked && a.check()) {
       a.unlocked = true;
+      accountAchievements.add(a.id);
       triggerGlow('gold', 2500);
       showAchievementPopup(a);
+      saveAccountData(platform, { earnedAchievements: [...accountAchievements] });
     }
   }
 }
@@ -883,79 +1041,95 @@ function showAchievementPopup(a: Achievement) {
 }
 
 // ── Achievement Yard Signs ───────────────────────────────────
-interface AchievementSignLabel {
-  el: HTMLDivElement;
-  position: THREE.Vector3;
+const achievementSignPositions: { x: number; z: number }[] = [];
+
+function getRandomSignPosition(): { x: number; z: number } {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const x = (Math.random() - 0.5) * 3; // -1.5 to 1.5
+    const z = 2.3 + Math.random() * 0.8; // 2.3 to 3.1 (tight group across the street)
+    // Check minimum distance from existing signs
+    let tooClose = false;
+    for (const pos of achievementSignPositions) {
+      const dx = x - pos.x;
+      const dz = z - pos.z;
+      if (Math.sqrt(dx * dx + dz * dz) < 0.45) { tooClose = true; break; }
+    }
+    if (!tooClose) return { x, z };
+  }
+  // Fallback
+  return { x: (Math.random() - 0.5) * 3, z: 2.3 + Math.random() * 0.8 };
 }
 
-const achievementSignLabels: AchievementSignLabel[] = [];
-let achievementSignCount = 0;
-
-function spawnAchievementSign(ach: typeof CONFIG.achievementSigns[0]) {
-  const idx = achievementSignCount++;
-  const x = -3 + idx * 0.6;
-  const z = 2.0;
+function spawnAchievementSign(ach: typeof CONFIG.achievementSigns[0], _showLabel: boolean = true) {
+  if (isMobile()) return; // skip 3D signs on mobile — sidebar is enough
+  const pos = getRandomSignPosition();
+  achievementSignPositions.push(pos);
+  const ry = (Math.random() - 0.5) * 0.4; // slight random rotation
 
   // Vertical post
   const postGeo = new THREE.BoxGeometry(0.02, 0.35, 0.02);
   const postMat = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
   const post = new THREE.Mesh(postGeo, postMat);
-  post.position.set(x, 0.175, z);
+  post.position.set(pos.x, 0.175, pos.z);
+  post.rotation.y = ry;
   post.castShadow = true;
   scene.add(post);
 
-  // Sign panel on top
+  // Sign panel with icon texture
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const c2d = canvas.getContext('2d')!;
+  c2d.fillStyle = '#ffffff';
+  c2d.fillRect(0, 0, 128, 128);
+
+  const texture = new THREE.CanvasTexture(canvas);
   const panelGeo = new THREE.BoxGeometry(0.25, 0.15, 0.01);
-  const panelMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  const panelMat = new THREE.MeshBasicMaterial({ map: texture });
   const panel = new THREE.Mesh(panelGeo, panelMat);
-  panel.position.set(x, 0.425, z);
-  panel.rotation.y = Math.PI;
+  panel.position.set(pos.x, 0.425, pos.z);
+  panel.rotation.y = ry;
   panel.castShadow = true;
   scene.add(panel);
 
-  // CSS overlay label
-  const labelEl = document.createElement('div');
-  labelEl.className = 'achievement-sign-label';
-  labelEl.textContent = `${ach.icon} ${ach.name}`;
-  document.getElementById('floor-panels')!.appendChild(labelEl);
-
-  achievementSignLabels.push({
-    el: labelEl,
-    position: new THREE.Vector3(x, 0.55, z),
+  // Load SVG icon onto the canvas
+  const img = new Image();
+  const svgFetch = fetch(ach.icon).then(r => r.text()).then(svgText => {
+    // Recolor SVG to dark for white background
+    const colored = svgText.replace(/currentColor/g, '#333333').replace(/#fff/gi, '#333333');
+    const blob = new Blob([colored], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    img.onload = () => {
+      c2d.drawImage(img, 16, 16, 96, 96);
+      URL.revokeObjectURL(url);
+      texture.needsUpdate = true;
+      markDirty();
+    };
+    img.src = url;
+  }).catch(() => {
+    // Fallback: draw a star shape
+    c2d.fillStyle = '#ffd700';
+    c2d.font = '64px serif';
+    c2d.textAlign = 'center';
+    c2d.textBaseline = 'middle';
+    c2d.fillText('★', 64, 64);
+    texture.needsUpdate = true;
   });
 
   markDirty();
 }
 
-function updateAchievementSignPositions() {
-  if (!_cameraMovedThisFrame && !needsRender) return;
-  for (const sign of achievementSignLabels) {
-    const projected = sign.position.clone().project(camera);
-    const hw = window.innerWidth / 2;
-    const hh = window.innerHeight / 2;
-    const sx = projected.x * hw + hw;
-    const sy = -(projected.y * hh) + hh;
-    if (projected.z > 0 && projected.z < 1) {
-      sign.el.style.left = `${sx}px`;
-      sign.el.style.top = `${sy}px`;
-      sign.el.style.opacity = '1';
-    } else {
-      sign.el.style.opacity = '0';
-    }
-  }
-}
-
 function showAchievementToast(ach: typeof CONFIG.achievementSigns[0]) {
   const toast = document.createElement('div');
   toast.className = 'achievement-toast';
-  toast.innerHTML = `🏆 Achievement: ${ach.icon} ${ach.name}`;
+  toast.innerHTML = `<img src="icons/trophy.svg" style="width:16px;height:16px;vertical-align:middle;filter:invert(1)"> Achievement: <img src="${ach.icon}" style="width:16px;height:16px;vertical-align:middle;filter:invert(1)"> ${ach.name}`;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 3000);
 }
 
 function checkSignAchievements() {
   for (const ach of CONFIG.achievementSigns) {
-    if (state.earnedAchievements.has(ach.id)) continue;
+    if (accountAchievements.has(ach.id)) continue;
     let earned = false;
     switch (ach.trigger) {
       case 'floors': earned = state.floorCount >= ach.value; break;
@@ -965,11 +1139,27 @@ function checkSignAchievements() {
       case 'events': earned = state.totalEvents >= ach.value; break;
       case 'occupancy_full': earned = getTotalTenants() >= getTotalSlots() && getTotalSlots() > 0; break;
       case 'penthouses': earned = state.floorStates.some(f => f.isPenthouse); break;
+      case 'penthouses_count': earned = state.floorStates.filter(f => f.isPenthouse).length >= ach.value; break;
+      case 'cities_played': earned = citiesPlayed.size >= ach.value; break;
+      case 'continent': {
+        const cont = (ach as any).continent as string;
+        earned = [...citiesPlayed].some(c => getCityContinent(c) === cont);
+        break;
+      }
+      case 'all_continents': {
+        const visitedContinents = new Set([...citiesPlayed].map(c => getCityContinent(c)));
+        earned = ALL_CONTINENTS.every(c => visitedContinents.has(c));
+        break;
+      }
+      case 'all_achievements': earned = accountAchievements.size >= CONFIG.achievementSigns.length - 1; break;
     }
     if (earned) {
-      state.earnedAchievements.add(ach.id);
+      accountAchievements.add(ach.id);
       spawnAchievementSign(ach);
       showAchievementToast(ach);
+      playAchievementSound();
+      // Save account data
+      saveAccountData(platform, { earnedAchievements: [...accountAchievements] });
     }
   }
 }
@@ -1017,6 +1207,12 @@ let bulkPhaseUnlocked = false; // once unlocked, stays unlocked forever
 function isInBulkPhase(): boolean {
   if (bulkPhaseUnlocked) return true;
   if (_bulkPhaseCached !== null) return _bulkPhaseCached;
+  // If we're PAST the cap, we already passed the gate (can't get here without it)
+  if (state.floorCount > PER_FLOOR_CAP) {
+    bulkPhaseUnlocked = true;
+    _bulkPhaseCached = true;
+    return true;
+  }
   if (state.floorCount >= PER_FLOOR_CAP && allFloorsFullyUpgraded()) {
     bulkPhaseUnlocked = true;
     _bulkPhaseCached = true;
@@ -1075,7 +1271,7 @@ function floorsNeedingStudio(): number {
 // ── Three.js Setup ──────────────────────────────────────────
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -1093,7 +1289,7 @@ scene.add(ambientLight);
 const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
 dirLight.position.set(8, 12, 6);
 dirLight.castShadow = true;
-dirLight.shadow.mapSize.set(1024, 1024);
+dirLight.shadow.mapSize.set(512, 512);
 dirLight.shadow.camera.near = 0.1;
 dirLight.shadow.camera.far = 40;
 dirLight.shadow.camera.left = -10;
@@ -1317,6 +1513,7 @@ function updateWeatherVisuals(eventId: string | null, delta: number) {
       }
     } else if (lightningTimer >= nextLightningIn) {
       lightningActive = 0.15; // 150ms flash
+      playThunderSound();
     }
     markDirty();
   }
@@ -1628,7 +1825,7 @@ interface MoneyPop {
   startTime: number;
   sx: number;
   sy: number;
-  angle: number; // radians, direction of travel
+  angle: number;
 }
 
 const activePops: MoneyPop[] = [];
@@ -1660,10 +1857,7 @@ function spawnMoneyPop(floorIndex: number) {
   el.style.left = `${sx}px`;
   el.style.top = `${sy}px`;
   popsContainer.appendChild(el);
-
-  // Fly to the RIGHT and slightly upward (10° to 50° upward-right)
   const angle = (-10 - Math.random() * 40) * (Math.PI / 180);
-
   activePops.push({ el, startTime: _frameTime, sx, sy, angle });
 }
 
@@ -1691,7 +1885,6 @@ function spawnMoneyPopStaggered(floorIndex: number, delayMs: number) {
   el.style.left = `${sx}px`;
   el.style.top = `${sy}px`;
   popsContainer.appendChild(el);
-
   const angle = (-10 - Math.random() * 40) * (Math.PI / 180);
   activePops.push({ el, startTime: _frameTime + delayMs, sx, sy, angle });
 }
@@ -1722,7 +1915,6 @@ function spawnCafePopStaggered(cafeIndex: number, delayMs: number) {
   el.style.left = `${sx}px`;
   el.style.top = `${sy}px`;
   popsContainer.appendChild(el);
-
   const angle = (-10 - Math.random() * 40) * (Math.PI / 180);
   activePops.push({ el, startTime: _frameTime + delayMs, sx, sy, angle });
 }
@@ -1733,19 +1925,18 @@ function updateMoneyPops() {
     const pop = activePops[i];
     const elapsed = now - pop.startTime;
     const t = elapsed / POP_DURATION;
-
     if (t >= 1) {
       pop.el.remove();
       activePops.splice(i, 1);
       continue;
     }
-
-    // Fly outward at angle, decelerate
-    const dist = t * 60;
-    const xOffset = Math.cos(pop.angle) * dist;
-    const yOffset = Math.sin(pop.angle) * dist;
-    pop.el.style.transform = `translate(-50%, -50%) translate(${xOffset}px, ${yOffset}px) scale(${1 - t * 0.3})`;
-    pop.el.style.opacity = String(1 - t * t);
+    if (t < 0) continue; // delayed, not started yet
+    const dist = t * 80;
+    const x = pop.sx + Math.cos(pop.angle) * dist;
+    const y = pop.sy + Math.sin(pop.angle) * dist;
+    pop.el.style.left = `${x}px`;
+    pop.el.style.top = `${y}px`;
+    pop.el.style.opacity = String(Math.max(0, 1 - t * 1.2));
   }
 }
 
@@ -1778,7 +1969,6 @@ function spawnCafePop(cafeIndex: number) {
   el.style.left = `${sx}px`;
   el.style.top = `${sy}px`;
   popsContainer.appendChild(el);
-
   const angle = (-10 - Math.random() * 40) * (Math.PI / 180);
   activePops.push({ el, startTime: _frameTime, sx, sy, angle });
 }
@@ -1787,6 +1977,10 @@ function tickMoneyPops(delta: number) {
   popTimer += delta;
   if (popTimer >= POP_INTERVAL) {
     popTimer = 0;
+    // Play cash sound — pitch scales with income (0-1 range, capped)
+    const totalIncome = getTotalRentPerSecond();
+    const incomeLevel = Math.min(1, Math.log10(Math.max(1, totalIncome)) / 6);
+    playCashSound(incomeLevel);
     // Only pop from max 3 random floors per tick to limit DOM creation
     const occupiedFloors: number[] = [];
     for (let i = 0; i < state.floorCount; i++) {
@@ -1870,6 +2064,7 @@ function ensureFloorPanels() {
           if (state.money >= cost && cost > 0) {
             state.money -= cost;
             floor.penthouseAmenityInstalls.set(nextPU.id, floor.maxTenants);
+            playUpgradeSound();
             renderUI();
           }
         }
@@ -1887,6 +2082,7 @@ function ensureFloorPanels() {
           floor.amenityInstalls.set(next.id, floor.maxTenants);
           next.totalInstalled += missing;
           invalidateUpgradeCache();
+          playUpgradeSound();
           renderUI();
         }
       } else if (isFloorFullyUpgraded(floorIndex) && floorIndex === state.floorCount - 1 && !floor.isPenthouse && !floor.hasPenthouse) {
@@ -1897,9 +2093,9 @@ function ensureFloorPanels() {
           floor.isPenthouse = true;
           floor.maxTenants = CONFIG.penthouseMaxTenants;
           floor.tenants = Math.min(floor.tenants, floor.maxTenants);
-          // Change 3D model color to gold
           convertFloorToGold(floorIndex);
           triggerGlow('gold', 2000);
+          playAchievementSound();
           renderUI();
         }
       } else if (isFloorFullyUpgraded(floorIndex) && floor.studioLevel < CONFIG.maxStudioLevel) {
@@ -1911,6 +2107,7 @@ function ensureFloorPanels() {
           state.totalStudios++;
           floor.maxTenants = getTotalMaxTenants(floor.studioLevel);
           invalidateUpgradeCache();
+          playStudioSound();
           renderUI();
         }
       } else if (isFloorComplete(floorIndex) && !floor.hasPenthouse && floorIndex >= PENTHOUSE_UNLOCK_FLOOR) {
@@ -1920,6 +2117,7 @@ function ensureFloorPanels() {
           state.money -= cost;
           floor.hasPenthouse = true;
           triggerGlow('gold', 1500);
+          playAchievementSound();
           renderUI();
         }
       }
@@ -2115,6 +2313,7 @@ function updateFloorPanelContent() {
 }
 
 // ── UI ──────────────────────────────────────────────────────
+const cityNameDisplay = document.getElementById('city-name-display')!;
 const moneyDisplay = document.getElementById('money-display')!;
 const incomeDisplay = document.getElementById('income-display')!;
 const floorDisplay = document.getElementById('floor-display')!;
@@ -2177,6 +2376,7 @@ floorBtn.addEventListener('click', () => {
     addFloorToBuilding();
     invalidateUpgradeCache();
     triggerGlow('green', 800);
+    playNewFloorSound();
     markDirty();
     renderUI();
   }
@@ -2197,6 +2397,7 @@ adBtn.addEventListener('click', () => {
     state.adBoost = Math.min(CONFIG.adMaxBoost, state.adBoost + CONFIG.adBoostPerClick);
     state.adTimer = CONFIG.adBoostMaxDuration;
     state.adClicks++;
+    playClickSound();
 
     // Spawn a flashy number on the button
     const pop = document.createElement('div');
@@ -2225,6 +2426,7 @@ for (const a of amenities) {
     const cost = getBulkAmenityCost(a);
     if (state.money < cost) return;
     state.money -= cost;
+    playUpgradeSound();
     // Fill all apartments on all floors with this amenity (skip penthouse floors)
     for (let i = 0; i < state.floorCount; i++) {
       const floor = state.floorStates[i];
@@ -2252,6 +2454,7 @@ bulkStudioBtn.addEventListener('click', () => {
   const cost = getBulkStudioCost();
   if (state.money < cost) return;
   state.money -= cost;
+  playStudioSound();
   for (let i = 0; i < state.floorCount; i++) {
     const floor = state.floorStates[i];
     if (floor && floor.studioLevel < CONFIG.maxStudioLevel && !floor.isPenthouse) {
@@ -2280,6 +2483,7 @@ for (const n of neighborhoodUpgrades) {
     n.count++;
     if (n.ownIncome > 0) triggerGlow('gold', 2000);
     spawnNeighborhoodModel(n);
+    playClickSound();
     renderUI();
   });
   hoodEl.appendChild(btn);
@@ -2337,6 +2541,7 @@ for (const bizId of BUSINESS_IDS) {
       if (state.money < cost) return;
       state.money -= cost;
       st.level++;
+      playUpgradeSound();
       renderUI();
     });
     btnsContainer.appendChild(btn);
@@ -2431,18 +2636,16 @@ function renderNeighborhoodUI() {
       btn.className = 'hood-btn';
       let bonusText = '';
       if (n.fillRateBonus > 0) {
-        bonusText += `<span class="rent-val">+${n.fillRateBonus.toFixed(2)}/s fill rate</span>`;
+        bonusText += `<span class="rent-val">+${n.fillRateBonus.toFixed(2)}/s fill</span>`;
       }
-      if (n.incomeMultiplier > 0) {
+      if (n.rentBonusPerTenant > 0) {
         if (bonusText) bonusText += ' · ';
-        bonusText += `<span class="rent-val">×${((1 + n.incomeMultiplier) * 100 - 100).toFixed(0)}% income</span>`;
-      }
-      if (n.rentBonusPerFloor > 0) {
-        if (bonusText) bonusText += ' · ';
-        bonusText += `<span class="rent-val">+$${n.rentBonusPerFloor}/floor</span>`;
+        bonusText += `<span class="rent-val">+$${n.rentBonusPerTenant}/tenant</span>`;
       }
       if (n.ownIncome > 0) {
-        const incomePreview = n.ownIncome * (1 + state.floorCount * n.ownIncomeFloorScale) * getBusinessUpgradeMultiplier(n.id);
+        const tenants = getTotalTenants();
+        const bizMult = getBusinessUpgradeMultiplier(n.id);
+        const incomePreview = n.ownIncome * Math.max(1, tenants) * bizMult;
         if (bonusText) bonusText += ' · ';
         bonusText += `<span class="rent-val">earns ${formatMoney(incomePreview)}/s</span>`;
       }
@@ -2518,11 +2721,35 @@ let achievementBadgesCreated = false;
 function renderAchievementsUI() {
   if (!achievementBadgesCreated) {
     achievementBadgesCreated = true;
+    // Render old-style achievements
     for (const a of achievements) {
       const badge = document.createElement('div');
       badge.className = 'achievement-badge';
       badge.id = `ach-${a.id}`;
       badge.innerHTML = `${a.icon}<div class="achievement-tooltip"><b>${a.name}</b><br>${a.desc}<br><span style="color:#7efa7e">${a.multiplier}x income</span></div>`;
+      badge.addEventListener('mouseenter', positionTooltip);
+      achievementsListEl.appendChild(badge);
+    }
+    function positionTooltip(e: MouseEvent) {
+      const badge = e.currentTarget as HTMLElement;
+      const tip = badge.querySelector('.achievement-tooltip') as HTMLElement;
+      if (!tip) return;
+      const rect = badge.getBoundingClientRect();
+      tip.style.left = `${rect.left + rect.width / 2}px`;
+      tip.style.top = `${rect.top - 4}px`;
+      tip.style.transform = 'translate(-50%, -100%)';
+    }
+    // Render sign achievements with SVG icons
+    for (const ach of CONFIG.achievementSigns) {
+      const badge = document.createElement('div');
+      badge.className = 'achievement-badge';
+      badge.id = `ach-sign-${ach.id}`;
+      const bonusPct = Math.round((ach.bonus - 1) * 100);
+      const earned = accountAchievements.has(ach.id);
+      const imgFilter = earned ? 'filter:invert(1)' : 'filter:invert(1) brightness(0.5)';
+      badge.innerHTML = `<img src="${ach.icon}" style="width:24px;height:24px;${imgFilter}"><div class="achievement-tooltip"><b>${ach.name}</b><br><span style="color:#7efa7e">+${bonusPct}% income</span></div>`;
+      badge.addEventListener('mouseenter', positionTooltip);
+      if (earned) badge.classList.add('unlocked');
       achievementsListEl.appendChild(badge);
     }
   }
@@ -2530,6 +2757,18 @@ function renderAchievementsUI() {
     const badge = document.getElementById(`ach-${a.id}`);
     if (badge) {
       badge.classList.toggle('unlocked', a.unlocked);
+    }
+  }
+  // Update sign achievement badges
+  for (const ach of CONFIG.achievementSigns) {
+    const badge = document.getElementById(`ach-sign-${ach.id}`);
+    if (badge) {
+      const earned = accountAchievements.has(ach.id);
+      badge.classList.toggle('unlocked', earned);
+      const img = badge.querySelector('img');
+      if (img) {
+        img.style.filter = earned ? 'invert(1)' : 'invert(1) brightness(0.5)';
+      }
     }
   }
 }
@@ -2541,9 +2780,12 @@ function renderUI() {
   const totalSlots = getTotalSlots();
   const fillRate = getFillRate();
 
+  cityNameDisplay.textContent = currentCityName;
   moneyDisplay.textContent = formatMoney(state.money);
-  const mult = getGlobalMultiplier();
-  incomeDisplay.textContent = formatMoney(income) + '/s' + (mult > 1.01 ? ` (×${mult.toFixed(2)})` : '');
+  const achMult = getAchievementMultiplier();
+  const pmMult = propMgmtLevel > 0 ? PROP_MGMT_LEVELS[propMgmtLevel - 1].multiplier : 1;
+  const totalMult = achMult * pmMult;
+  incomeDisplay.textContent = formatMoney(income) + '/s' + (totalMult > 1.01 ? ` (×${totalMult.toFixed(1)})` : '');
   floorDisplay.textContent = String(state.floorCount);
   rentDisplay.textContent = formatMoney(avgRent) + ' avg';
   fillRateDisplay.textContent = `${fillRate.toFixed(2)}/s`;
@@ -2718,6 +2960,8 @@ function tickTenantFill(delta: number) {
     if (bestFloor >= 0) {
       state.floorStates[bestFloor].tenants++;
       spawnTenant(true);
+      // Play tenant sound occasionally (not every single tenant)
+      if (Math.random() < 0.3) playTenantSound();
       markDirty();
     } else {
       // All floors full, stop accumulating
@@ -2772,6 +3016,7 @@ function tickCityEvents(delta: number) {
   if (state.activeEvent) {
     state.activeEvent.timeLeft -= delta;
     if (state.activeEvent.timeLeft <= 0) {
+      if (state.activeEvent.event.id === 'rainy_day') stopRainAmbience();
       state.activeEvent = null;
       state.eventCooldown = 20 + Math.random() * 40; // 20-60 seconds
       eventBanner.classList.remove('active');
@@ -2788,6 +3033,8 @@ function tickCityEvents(delta: number) {
         else if (event.rentMultiplier >= 10) triggerGlow('purple', 1500);
         else triggerGlow('green', 1000);
         eventBanner.classList.add('active');
+        playEventSound();
+        if (event.id === 'rainy_day') startRainAmbience();
       } else {
         state.eventCooldown = 30; // retry sooner if no eligible events
       }
@@ -2838,29 +3085,52 @@ let _frameTime = 0;
 
 function invalidateUpgradeCache() { _bulkPhaseCached = null; }
 
-function showWelcomeBack(earned: number, seconds: number) {
-  const banner = document.createElement('div');
-  banner.style.cssText = `
-    position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
-    background:rgba(0,0,0,0.85); backdrop-filter:blur(10px);
-    color:#fff; padding:24px 36px; border-radius:16px; z-index:1000;
-    text-align:center; pointer-events:auto; cursor:pointer;
-    border:1px solid rgba(255,255,255,0.15);
-  `;
-  const mins = Math.floor(seconds / 60);
-  const timeText = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
-  banner.innerHTML = `
-    <div style="font-size:14px;color:#aaa;margin-bottom:8px">Welcome back! You were away ${timeText}</div>
-    <div style="font-size:32px;font-weight:bold;color:#7efa7e">+${formatMoney(earned)}</div>
-    <div style="font-size:12px;color:#888;margin-top:12px">Tap to continue</div>
-  `;
-  document.body.appendChild(banner);
-  banner.addEventListener('click', () => banner.remove());
-  setTimeout(() => banner.remove(), 8000);
+function showWelcomeBack(awaySeconds: number, earnings: number) {
+  const wb = document.getElementById('welcome-back')!;
+  const wbTime = document.getElementById('wb-time')!;
+  const wbAmount = document.getElementById('wb-amount')!;
+  const wbCollect = document.getElementById('wb-collect')!;
+
+  const hours = Math.floor(awaySeconds / 3600);
+  const minutes = Math.floor((awaySeconds % 3600) / 60);
+  if (hours > 0) {
+    wbTime.textContent = `${hours}h ${minutes}m`;
+  } else {
+    wbTime.textContent = `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+  }
+
+  wbAmount.textContent = formatMoney(earnings);
+  wb.style.display = 'flex';
+
+  wbCollect.onclick = () => {
+    state.money += earnings;
+    state.totalMoneyEarned += earnings;
+    wb.style.display = 'none';
+    playCashSound(0.8);
+    triggerGlow('green', 1500);
+    renderUI();
+  };
 }
+
+let tabHidden = false;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    tabHidden = true;
+  } else {
+    tabHidden = false;
+    lastTime = performance.now(); // prevent huge delta spike on return
+    markDirty();
+  }
+});
 
 function gameLoop(time: number) {
   requestAnimationFrame(gameLoop);
+
+  // Skip rendering when tab is hidden (massive CPU savings)
+  if (tabHidden) {
+    lastTime = time;
+    return;
+  }
 
   _currentFrame++;
   _cameraMovedThisFrame = false;
@@ -2872,8 +3142,8 @@ function gameLoop(time: number) {
   const cappedDelta = Math.min(rawDelta, 14400); // cap at 4 hours
   const visualDelta = Math.min(rawDelta, 0.1); // clamp for animations only
 
-  // ── Welcome back notification for idle earnings ──
-  if (cappedDelta > 5) {
+  // ── Welcome back notification for idle earnings (skip first frame) ──
+  if (cappedDelta > 5 && _currentFrame > 1) {
     const idleEarnings = getTotalRentPerSecondCached() * cappedDelta;
     if (idleEarnings > 0) showWelcomeBack(idleEarnings, cappedDelta);
   }
@@ -2892,6 +3162,13 @@ function gameLoop(time: number) {
   // ── Ad boost decay ──
   tickAdBoost(cappedDelta);
 
+  // ── Auto-save ──
+  autoSaveTimer += cappedDelta;
+  if (autoSaveTimer >= 30) {
+    autoSaveTimer = 0;
+    autoSave();
+  }
+
   // ── City events ──
   tickCityEvents(cappedDelta);
 
@@ -2901,10 +3178,10 @@ function gameLoop(time: number) {
   // ── Churn tick ──
   tickChurn(cappedDelta);
 
-  // ── Tenants (only if active, render throttled) ──
+  // ── Tenants (only if active) ──
   if (activeTenants.length > 0) {
     updateTenants(visualDelta);
-    if (_currentFrame % 3 === 0) markDirty();
+    markDirty();
   }
 
   // ── Money pops (DOM, throttled with the pops themselves) ──
@@ -2924,7 +3201,7 @@ function gameLoop(time: number) {
 
   // ── Floor panel positions (AFTER camera so projections are correct) ──
   updateFloorPanelPositions();
-  updateAchievementSignPositions();
+  // Achievement signs are now purely 3D — no CSS positioning needed
 
   // ── DOM content updates throttled ──
   uiTimer += visualDelta;
@@ -2937,7 +3214,7 @@ function gameLoop(time: number) {
     checkSignAchievements();
   }
 
-  // ── Only render when needed ──
+  // ── Render when needed ──
   if (needsRender) {
     renderer.render(scene, camera);
     needsRender = false;
@@ -2973,10 +3250,433 @@ window.addEventListener('resize', () => {
   renderUI();
 };
 
-async function init() {
-  await initBuilding();
-  renderUI();
-  requestAnimationFrame(gameLoop);
+// ── Auto-save ────────────────────────────────────────────────
+let currentCityName = '';
+let autoSaveTimer = 0;
+
+async function autoSave() {
+  if (!currentCityName) return;
+  const data = serializeState(currentCityName);
+  await platform.save(currentCityName, JSON.stringify(data));
+  await updateSaveIndex(platform, {
+    cityName: currentCityName,
+    floorCount: state.floorCount,
+    money: state.money,
+    timestamp: Date.now(),
+  });
 }
 
-init();
+window.addEventListener('beforeunload', () => { autoSave(); });
+
+// ── Static formatters for start screen ───────────────────────
+function formatMoneyStatic(amount: number): string {
+  if (amount < 1000) return '$' + Math.floor(amount);
+  if (amount < 1e6) return '$' + (amount / 1e3).toFixed(1) + 'K';
+  if (amount < 1e9) return '$' + (amount / 1e6).toFixed(1) + 'M';
+  if (amount < 1e12) return '$' + (amount / 1e9).toFixed(1) + 'B';
+  if (amount < 1e15) return '$' + (amount / 1e12).toFixed(1) + 'T';
+  return '$' + amount.toExponential(1);
+}
+
+function formatTimeAgo(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+// ── Rebuild Building From Saved State ────────────────────────
+async function rebuildBuildingFromState() {
+  // Clear existing building
+  while (buildingGroup.children.length > 0) {
+    buildingGroup.remove(buildingGroup.children[0]);
+  }
+
+  // Rebuild ground floor
+  const groundFloor = await loadModel('models/building-door.glb');
+  groundFloor.position.y = 0;
+  buildingGroup.add(groundFloor);
+
+  const box = new THREE.Box3().setFromObject(groundFloor);
+  const size = box.getSize(new THREE.Vector3());
+  actualFloorHeight = size.y;
+
+  // Add additional floors
+  const floorModels = [
+    'models/building-window.glb',
+    'models/building-windows.glb',
+    'models/building-window-balcony.glb',
+    'models/building-window-awnings.glb',
+    'models/building-window-sill.glb',
+  ];
+
+  for (let i = 1; i < state.floorCount; i++) {
+    const modelPath = floorModels[(i - 1) % floorModels.length];
+    const newFloor = await loadModel(modelPath);
+    newFloor.position.y = i * actualFloorHeight;
+    buildingGroup.add(newFloor);
+  }
+
+  // Add roof
+  roofModel = await loadModel('models/roof-flat-top.glb');
+  roofModel.position.y = state.floorCount * actualFloorHeight;
+  buildingGroup.add(roofModel);
+
+  visualFloorCount = state.floorCount;
+  floorsPurchased = state.floorCount - 1;
+
+  // Rebuild neighborhood models
+  // Show sidewalk if purchased
+  const sidewalkDef = neighborhoodUpgrades.find(n => n.id === 'sidewalk');
+  if (sidewalkDef && sidewalkDef.count > 0) {
+    sidewalk.visible = true;
+  }
+
+  for (const n of neighborhoodUpgrades) {
+    if (n.id === 'sidewalk') continue; // handled above
+    const savedCount = n.count;
+    for (let i = 0; i < savedCount; i++) {
+      n.count = i + 1;
+      // Only spawn visual if within position limit or every 5th
+      if (n.count <= n.positions.length || n.count % 5 === 0) {
+        await spawnNeighborhoodModel(n);
+      }
+    }
+    n.count = savedCount;
+  }
+
+  // Rebuild achievement signs (no labels for already-earned ones)
+  for (const ach of CONFIG.achievementSigns) {
+    if (accountAchievements.has(ach.id)) {
+      spawnAchievementSign(ach, false);
+    }
+  }
+
+  // Convert penthouse floors to gold
+  for (let i = 0; i < state.floorStates.length; i++) {
+    if (state.floorStates[i].isPenthouse) {
+      convertFloorToGold(i);
+    }
+  }
+
+  updateCamera();
+  markDirty();
+}
+
+// ── Start Screen ─────────────────────────────────────────────
+const startScreen = document.getElementById('start-screen')!;
+const startButtons = document.getElementById('start-buttons')!;
+
+async function showStartScreen() {
+  platform = detectPlatform();
+  await platform.init();
+
+  // Load account-level achievements
+  const accountData = await loadAccountData(platform);
+  accountAchievements = new Set(accountData.earnedAchievements);
+  citiesPlayed = new Set(accountData.citiesPlayed ?? []);
+  // Sync to achievements array
+  for (const a of achievements) {
+    a.unlocked = accountAchievements.has(a.id);
+  }
+
+  menuBtn.style.display = 'none';
+
+  const saves = await loadSaveIndex(platform);
+  startButtons.innerHTML = '';
+
+  if (saves.length > 0) {
+    // Sort by most recent
+    saves.sort((a, b) => b.timestamp - a.timestamp);
+    const latest = saves[0];
+
+    // Continue button
+    const continueBtn = document.createElement('button');
+    continueBtn.className = 'start-btn primary';
+    continueBtn.innerHTML = `
+      <span class="btn-label">▶ Continue — ${latest.cityName}</span>
+      <span class="btn-detail">${latest.floorCount} floors · ${formatMoneyStatic(latest.money)}</span>
+    `;
+    continueBtn.onclick = () => loadAndStart(latest.cityName);
+    startButtons.appendChild(continueBtn);
+
+    // Load game button (shows list)
+    if (saves.length > 1) {
+      const loadBtn = document.createElement('button');
+      loadBtn.className = 'start-btn secondary';
+      loadBtn.innerHTML = '<span class="btn-label">Load Game</span>';
+      loadBtn.onclick = () => showSaveList(saves);
+      startButtons.appendChild(loadBtn);
+    }
+  }
+
+  // New game button
+  const newBtn = document.createElement('button');
+  newBtn.className = 'start-btn secondary';
+  newBtn.innerHTML = '<span class="btn-label">New Game</span>';
+  newBtn.onclick = () => startNewGame(saves);
+  startButtons.appendChild(newBtn);
+
+  // Settings button
+  const settingsBtn = document.createElement('button');
+  settingsBtn.className = 'start-btn secondary';
+  settingsBtn.innerHTML = '<span class="btn-label">Settings</span>';
+  settingsBtn.onclick = () => showSettings();
+  startButtons.appendChild(settingsBtn);
+
+  // Achievement showcase
+  const achSection = document.createElement('div');
+  achSection.style.cssText = 'margin-top: 20px; text-align: left;';
+  let achGridHtml = '';
+  for (const ach of CONFIG.achievementSigns) {
+    const earned = accountAchievements.has(ach.id);
+    const bonusPct = Math.round((ach.bonus - 1) * 100);
+    if (earned) {
+      achGridHtml += `<div title="${ach.name} — ${bonusPct}% income boost" style="width:32px;height:32px;border:1px solid #ffd700;border-radius:4px;display:flex;align-items:center;justify-content:center;background:rgba(255,215,0,0.1)"><img src="${ach.icon}" style="width:20px;height:20px;filter:invert(1)"></div>`;
+    } else {
+      achGridHtml += `<div title="${ach.name} — ${bonusPct}% income boost" style="width:32px;height:32px;border:1px solid #555;border-radius:4px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.03);opacity:0.4"><img src="${ach.icon}" style="width:20px;height:20px;filter:invert(1)"></div>`;
+    }
+  }
+  achSection.innerHTML = `
+    <h3 style="color: #ffd700; font-size: 14px; margin-bottom: 8px;">
+      <img src="icons/trophy.svg" style="width:16px;height:16px;vertical-align:middle;filter:invert(1)"> Achievements (${accountAchievements.size}/${CONFIG.achievementSigns.length})
+    </h3>
+    <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+      ${achGridHtml}
+    </div>
+    <p style="color: #aaa; font-size: 11px; margin-top: 6px;">
+      Achievements boost income across all cities
+    </p>
+  `;
+  startButtons.appendChild(achSection);
+}
+
+function showSaveList(saves: SaveMeta[]) {
+  startButtons.innerHTML = '';
+
+  const title = document.createElement('h3');
+  title.style.cssText = 'color: white; margin-bottom: 12px;';
+  title.textContent = 'Load Game';
+  startButtons.appendChild(title);
+
+  const list = document.createElement('div');
+  list.className = 'save-list';
+
+  for (const save of saves) {
+    const entry = document.createElement('div');
+    entry.className = 'save-entry';
+
+    const info = document.createElement('div');
+    info.innerHTML = `
+      <div class="save-city">${save.cityName}</div>
+      <div class="save-info">${save.floorCount} floors · ${formatMoneyStatic(save.money)} · ${formatTimeAgo(save.timestamp)}</div>
+    `;
+    info.style.cursor = 'pointer';
+    info.style.flex = '1';
+    info.onclick = () => loadAndStart(save.cityName);
+    entry.appendChild(info);
+
+    const del = document.createElement('button');
+    del.className = 'save-delete';
+    del.textContent = '\u2715';
+    del.onclick = async (e) => {
+      e.stopPropagation();
+      if (confirm(`Delete save "${save.cityName}"?`)) {
+        await platform.deleteSave(save.cityName);
+        await removeSaveFromIndex(platform, save.cityName);
+        const updatedSaves = await loadSaveIndex(platform);
+        if (updatedSaves.length > 0) {
+          showSaveList(updatedSaves);
+        } else {
+          showStartScreen();
+        }
+      }
+    };
+    entry.appendChild(del);
+
+    list.appendChild(entry);
+  }
+
+  startButtons.appendChild(list);
+
+  const backBtn = document.createElement('button');
+  backBtn.className = 'back-btn';
+  backBtn.textContent = '\u2190 Back';
+  backBtn.onclick = () => showStartScreen();
+  startButtons.appendChild(backBtn);
+}
+
+function showSettings() {
+  startButtons.innerHTML = '';
+
+  const title = document.createElement('h3');
+  title.style.cssText = 'color: white; margin-bottom: 12px;';
+  title.textContent = 'Settings';
+  startButtons.appendChild(title);
+
+  const panel = document.createElement('div');
+  panel.className = 'settings-panel';
+  panel.innerHTML = '<p>Audio and graphics settings coming soon.</p>';
+  startButtons.appendChild(panel);
+
+  const backBtn = document.createElement('button');
+  backBtn.className = 'back-btn';
+  backBtn.textContent = '\u2190 Back';
+  backBtn.onclick = () => showStartScreen();
+  startButtons.appendChild(backBtn);
+}
+
+function notifyCrazyGamesStart() {
+  try {
+    const cg = (window as any).CrazyGames;
+    if (cg?.SDK) cg.SDK.game?.gameplayStart();
+  } catch {}
+}
+function notifyCrazyGamesStop() {
+  try {
+    const cg = (window as any).CrazyGames;
+    if (cg?.SDK) cg.SDK.game?.gameplayStop();
+  } catch {}
+}
+
+async function startNewGame(existingSaves: SaveMeta[]) {
+  const usedCities = existingSaves.map(s => s.cityName);
+  currentCityName = getRandomCity(usedCities);
+  startScreen.classList.add('hidden');
+  preloadSounds();
+  await initGame();
+  menuBtn.style.display = 'flex';
+  notifyCrazyGamesStart();
+  // Track city for achievements
+  citiesPlayed.add(currentCityName);
+  saveAccountData(platform, { earnedAchievements: [...accountAchievements], citiesPlayed: [...citiesPlayed] });
+}
+
+async function loadAndStart(cityName: string) {
+  const raw = await platform.load(cityName);
+  if (!raw) {
+    alert('Save not found!');
+    return;
+  }
+  try {
+    const data: SaveData = JSON.parse(raw);
+    currentCityName = cityName;
+    startScreen.classList.add('hidden');
+    preloadSounds();
+    await initGame();
+    deserializeState(data);
+    // Force recalculate bulk phase
+    bulkPhaseUnlocked = false;
+    invalidateUpgradeCache();
+    // If past floor 10, we're in bulk phase
+    if (state.floorCount > PER_FLOOR_CAP) {
+      bulkPhaseUnlocked = true;
+    }
+    // Sync account achievements
+    for (const a of achievements) {
+      a.unlocked = accountAchievements.has(a.id);
+    }
+    // Rebuild building visually
+    await rebuildBuildingFromState();
+    menuBtn.style.display = 'flex';
+    notifyCrazyGamesStart();
+    // Track city for achievements
+    citiesPlayed.add(cityName);
+    saveAccountData(platform, { earnedAchievements: [...accountAchievements], citiesPlayed: [...citiesPlayed] });
+    renderUI();
+
+    // Offline progress — calculate earnings since last save
+    const savedIncome = data.incomePerSecond ?? 0;
+    const savedTime = data.timestamp ?? 0;
+    if (savedIncome > 0 && savedTime > 0) {
+      const awaySeconds = Math.floor((Date.now() - savedTime) / 1000);
+      const MIN_AWAY = 60; // at least 1 minute to show
+      const MAX_AWAY = 8 * 3600; // cap at 8 hours of earnings
+      if (awaySeconds >= MIN_AWAY) {
+        const effectiveSeconds = Math.min(awaySeconds, MAX_AWAY);
+        // Give 50% of what they would have earned (standard idle game practice)
+        const offlineEarnings = savedIncome * effectiveSeconds * 0.5;
+        if (offlineEarnings > 0) {
+          showWelcomeBack(awaySeconds, offlineEarnings);
+        }
+      }
+    }
+  } catch (e) {
+    alert('Failed to load save: ' + e);
+  }
+}
+
+
+
+let gameStarted = false;
+
+async function initGame() {
+  if (!gameStarted) {
+    gameStarted = true;
+    lastTime = performance.now();
+    _currentFrame = 0;
+    await initBuilding();
+    renderUI();
+    requestAnimationFrame(gameLoop);
+  } else {
+    // Game already running, just update UI
+    updateCamera();
+    renderUI();
+    markDirty();
+  }
+}
+
+// ── In-Game Menu ─────────────────────────────────────────────
+const menuBtn = document.getElementById('menu-btn')!;
+const gameMenu = document.getElementById('game-menu')!;
+const menuResume = document.getElementById('menu-resume')!;
+const menuSave = document.getElementById('menu-save')!;
+const menuSettings = document.getElementById('menu-settings')!;
+const menuQuit = document.getElementById('menu-quit')!;
+
+menuBtn.addEventListener('click', () => {
+  gameMenu.classList.add('active');
+});
+
+menuResume.addEventListener('click', () => {
+  gameMenu.classList.remove('active');
+});
+
+menuSave.addEventListener('click', async () => {
+  await autoSave();
+  showSaveNotification();
+  gameMenu.classList.remove('active');
+});
+
+menuSettings.addEventListener('click', () => {
+  // For now just close menu — settings page coming later
+  gameMenu.classList.remove('active');
+});
+
+menuQuit.addEventListener('click', async () => {
+  await autoSave();
+  notifyCrazyGamesStop();
+  gameMenu.classList.remove('active');
+  startScreen.classList.remove('hidden');
+  showStartScreen();
+});
+
+function showSaveNotification() {
+  const n = document.createElement('div');
+  n.style.cssText = `
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    background:rgba(0,0,0,0.8); color:#4ade80; padding:8px 20px;
+    border-radius:8px; font-size:14px; z-index:2000;
+    animation: fadeInUp 0.3s ease-out;
+  `;
+  n.textContent = '\u2713 Game saved';
+  document.body.appendChild(n);
+  setTimeout(() => n.remove(), 2000);
+}
+
+// Show start screen immediately
+showStartScreen();

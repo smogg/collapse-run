@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>One More Floor</title>
+  <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { width: 100%; height: 100%; overflow: hidden; touch-action: none; }
@@ -29,7 +30,7 @@
       width: 220px;
       z-index: 20;
       overflow-y: auto;
-      overflow-x: hidden;
+      overflow-x: visible;
       scrollbar-width: thin;
       scrollbar-color: rgba(255,255,255,0.2) transparent;
     }
@@ -607,26 +608,12 @@
     }
     .achievement-badge.unlocked { opacity: 1; background: rgba(255,215,0,0.15); border-color: #ffd700; }
     .achievement-badge .achievement-tooltip {
-      display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+      display: none; position: fixed;
       background: rgba(0,0,0,0.9); border: 1px solid rgba(255,255,255,0.2);
       padding: 6px 10px; border-radius: 6px; white-space: nowrap; font-size: 11px;
-      color: #fff; z-index: 100; margin-bottom: 4px;
+      color: #fff; z-index: 2000; pointer-events: none;
     }
     .achievement-badge:hover .achievement-tooltip { display: block; }
-
-    /* ── Achievement Yard Sign Labels ── */
-    .achievement-sign-label {
-      position: absolute;
-      pointer-events: none;
-      font-size: 9px;
-      color: #333;
-      background: rgba(255,255,255,0.9);
-      padding: 1px 4px;
-      border-radius: 3px;
-      white-space: nowrap;
-      text-align: center;
-      transform: translate(-50%, -100%);
-    }
 
     /* ── Achievement Toast ── */
     .achievement-toast {
@@ -646,17 +633,302 @@
     }
     @keyframes toastIn { from { bottom: 0; opacity: 0; } to { bottom: 80px; opacity: 1; } }
     @keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
+
+    /* ── Start Screen ── */
+    #start-screen {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+
+    #start-screen.hidden {
+      display: none;
+    }
+
+    .start-content {
+      text-align: center;
+      color: white;
+      max-width: 400px;
+      width: 90%;
+    }
+
+    .game-title {
+      font-size: 48px;
+      font-weight: 900;
+      margin-bottom: 4px;
+      background: linear-gradient(135deg, #ffd700, #ffaa00);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: none;
+    }
+
+    .game-subtitle {
+      font-size: 16px;
+      color: #8899aa;
+      margin-bottom: 32px;
+    }
+
+    #start-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .start-btn {
+      padding: 14px 24px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      text-align: left;
+    }
+
+    .start-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+
+    .start-btn.primary {
+      background: linear-gradient(135deg, #4ade80, #22c55e);
+      color: #111;
+    }
+
+    .start-btn.secondary {
+      background: rgba(255,255,255,0.1);
+      color: #ddd;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+
+    .start-btn .btn-label {
+      display: block;
+      font-size: 16px;
+    }
+
+    .start-btn .btn-detail {
+      display: block;
+      font-size: 12px;
+      opacity: 0.7;
+      margin-top: 2px;
+    }
+
+    .save-list {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 250px;
+      overflow-y: auto;
+    }
+
+    .save-entry {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .save-entry:hover {
+      background: rgba(255,255,255,0.12);
+    }
+
+    .save-entry .save-city {
+      font-weight: 700;
+      font-size: 15px;
+    }
+
+    .save-entry .save-info {
+      font-size: 12px;
+      color: #8899aa;
+    }
+
+    .save-entry .save-delete {
+      background: none;
+      border: none;
+      color: #ff6666;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    .save-entry .save-delete:hover {
+      background: rgba(255,0,0,0.15);
+    }
+
+    .settings-panel {
+      color: #aaa;
+      text-align: center;
+      padding: 20px 0;
+    }
+
+    .back-btn {
+      margin-top: 16px;
+      padding: 8px 20px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #ddd;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    #menu-btn {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 30;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: white;
+      font-size: 20px;
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      cursor: pointer;
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+    #menu-btn:hover {
+      background: rgba(0,0,0,0.7);
+    }
+
+    #game-menu {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(5px);
+      z-index: 1500;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    #game-menu.active {
+      display: flex;
+    }
+    .menu-panel {
+      background: rgba(20,25,40,0.95);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 16px;
+      padding: 24px;
+      width: 300px;
+      max-width: 90%;
+      text-align: center;
+      color: white;
+    }
+    .menu-panel h2 {
+      margin-bottom: 16px;
+      font-size: 20px;
+    }
+    .menu-option {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 8px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      color: white;
+      font-size: 15px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .menu-option:hover {
+      background: rgba(255,255,255,0.15);
+    }
+    .menu-option.danger {
+      color: #ff6666;
+      border-color: rgba(255,100,100,0.2);
+    }
+
+    /* Welcome Back overlay */
+    #welcome-back {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(8px);
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .welcome-panel {
+      background: linear-gradient(135deg, rgba(30,40,60,0.97), rgba(20,25,40,0.97));
+      border: 2px solid rgba(100,200,100,0.3);
+      border-radius: 20px;
+      padding: 32px 40px;
+      text-align: center;
+      color: white;
+      max-width: 360px;
+      width: 90%;
+    }
+    .welcome-panel h2 {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+    .welcome-time {
+      color: #aaa;
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+    .welcome-earned {
+      color: #8f8;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+    .welcome-amount {
+      font-size: 36px;
+      font-weight: bold;
+      color: #4ade80;
+      margin-bottom: 24px;
+      text-shadow: 0 0 20px rgba(74,222,128,0.4);
+    }
   </style>
 </head>
 <body>
   <canvas id="game-canvas"></canvas>
   <div id="screen-glow"></div>
   <div id="event-banner"></div>
+  <div id="start-screen">
+    <div class="start-content">
+      <h1 class="game-title">One More Floor</h1>
+      <p class="game-subtitle">Build your real estate empire</p>
+      <div id="start-buttons">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </div>
+  <div id="welcome-back" style="display:none">
+    <div class="welcome-panel">
+      <h2>Welcome Back!</h2>
+      <p class="welcome-time">You were away for <span id="wb-time"></span></p>
+      <p class="welcome-earned">Your tenants earned</p>
+      <div class="welcome-amount" id="wb-amount"></div>
+      <button class="start-btn" id="wb-collect">Collect</button>
+    </div>
+  </div>
   <div id="ui">
+    <button id="menu-btn" title="Menu">&#9881;&#65039;</button>
     <div id="money-pops"></div>
     <div id="floor-panels"></div>
     <div id="panel">
       <div id="stats">
+        <div id="city-name-display" style="font-size:11px;color:#8899aa;margin-bottom:4px"></div>
         <div class="money" id="money-display">$0</div>
         <div class="income" id="income-display">$0/s</div>
         <div class="info-row">
@@ -694,6 +966,15 @@
         <div class="section-header">Achievements</div>
         <div id="achievements-list"></div>
       </div>
+    </div>
+  </div>
+  <div id="game-menu">
+    <div class="menu-panel">
+      <h2>Menu</h2>
+      <button class="menu-option" id="menu-resume">&#9654; Resume</button>
+      <button class="menu-option" id="menu-save">&#128190; Save Game</button>
+      <button class="menu-option" id="menu-settings">&#9881;&#65039; Settings</button>
+      <button class="menu-option danger" id="menu-quit">&#128682; Save &amp; Quit</button>
     </div>
   </div>
   <script type="module" src="/src/main.ts"></script>
