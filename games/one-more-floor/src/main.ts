@@ -12,69 +12,66 @@ let platform: GamePlatform;
 // GAME CONFIG — tweak all balance numbers here
 // ══════════════════════════════════════════════════════════════
 const CONFIG = {
-  // Economy
-  baseRent: 80,               // rent per tenant with no upgrades
-  incomeTickRate: 0.1,      // minimum money increment
+  // Economy — baseRent is THE tuning lever for game speed
+  baseRent: 2,
+  incomeTickRate: 0.1,
 
   // Floors
-  floorBaseCost: 10000,     // first extra floor costs this
-  floorCostScale: 3,      // each floor costs this × more (10k, 72k, 518k, 3.7M...)
-  perFloorCap: 10,          // per-floor UI phase ends here
+  floorBaseCost: 5000,
+  floorCostScale: 3.5,       // each floor 3.5× more expensive
+  perFloorCap: 10,
 
   // Tenants
-  baseFillRate: 0.02,        // base tenants arriving per second (across whole building)
-  baseChurnRate: 0.08,       // base chance per tenant per minute to leave
-  amenityChurnReduction: 0.007, // each installed amenity reduces churn by this much
-  studioBaseCost: 150000,    // base cost of studio conversion
-  studioCostScale: 50,       // each studio level costs 50x more
-  maxStudioLevel: 4,         // max studio upgrades per floor
+  baseFillRate: 0.03,
+  baseChurnRate: 0.06,
+  amenityChurnReduction: 0.008,
+  studioBaseCost: 150000,
+  studioCostScale: 5,         // each studio level 5× the previous
+  maxStudioLevel: 4,
 
-  // Ads (temporary boost, click-heavy)
-  adCost: 5,                 // flat cost per click
-  adBoostPerClick: 0.08,     // each click adds this to fill rate
-  adBoostMaxDuration: 30,    // timer caps at 30s, doesn't stack beyond
-  adMaxBoost: 2.0,           // max fill rate bonus from ads
-  adDecayRate: 0.015,        // boost decays slowly so clicks feel impactful
+  // Hire Agents
+  adCost: 5,
+  adBoostPerClick: 0.08,
+  adBoostMaxDuration: 30,
+  adMaxBoost: 2.0,
+  adDecayRate: 0.015,
 
-  // Amenities (per-floor upgrades)
+  // Per-floor amenities — cost = baseCost × floorCostScale^floor × apartments
   amenities: [
-    { id: 'hotwater', name: 'Hot Water', icon: '🚿', rentBonus: 3.3,  baseCost: 4,    costScale: 1.35, unlockFloors: 1 },
-    { id: 'heating',  name: 'Heating',   icon: '🔥', rentBonus: 5.5,  baseCost: 12,   costScale: 1.40, unlockFloors: 1 },
-    { id: 'ac',       name: 'AC',        icon: '❄️', rentBonus: 8.8,  baseCost: 35,   costScale: 1.45, unlockFloors: 1 },
-    { id: 'balcony',  name: 'Balcony',   icon: '🌿', rentBonus: 13.2, baseCost: 400,  costScale: 1.50, unlockFloors: 1 },
-    { id: 'laundry',  name: 'Laundry',   icon: '👕', rentBonus: 11,   baseCost: 1000, costScale: 1.50, unlockFloors: 1 },
-    { id: 'gym',      name: 'Gym',       icon: '💪', rentBonus: 19.8, baseCost: 2500, costScale: 1.55, unlockFloors: 1 },
+    { id: 'hotwater', name: 'Hot Water', icon: '🚿', rentBonus: 1,  baseCost: 2,   costScale: 1.0, unlockFloors: 1 },
+    { id: 'heating',  name: 'Heating',   icon: '🔥', rentBonus: 2,  baseCost: 6,   costScale: 1.0, unlockFloors: 1 },
+    { id: 'ac',       name: 'AC',        icon: '❄️', rentBonus: 4,  baseCost: 20,  costScale: 1.0, unlockFloors: 1 },
+    { id: 'balcony',  name: 'Balcony',   icon: '🌿', rentBonus: 6,  baseCost: 60,  costScale: 1.0, unlockFloors: 1 },
+    { id: 'laundry',  name: 'Laundry',   icon: '👕', rentBonus: 5,  baseCost: 150, costScale: 1.0, unlockFloors: 1 },
+    { id: 'gym',      name: 'Gym',       icon: '💪', rentBonus: 8,  baseCost: 400, costScale: 1.0, unlockFloors: 1 },
   ],
 
-  // Neighborhood upgrades
-  // incomeMultiplier: each purchase multiplies TOTAL income by (1 + this)
-  // rentBonusPerFloor: flat bonus added to each floor's rent
+  // Neighborhood upgrades — flat rent bonus per tenant + own cost curve
+  // No incomeMultiplier (achievements handle that). Business income scales with totalTenants.
   neighborhood: [
-    { id: 'sidewalk',    name: 'Sidewalk',       icon: '🚶', rentBonusPerFloor: 5,    incomeMultiplier: 0.15, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 5000, costScale: 1.00, maxCount: 1,   unlockFloors: 1,  fillRateBonus: 0 },
-    { id: 'streetlight', name: 'Streetlight',   icon: '💡', rentBonusPerFloor: 0.5,  incomeMultiplier: 0.005, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 200,  costScale: 2.0,  maxCount: 20,  unlockFloors: 1,  fillRateBonus: 0 },
-    { id: 'tree',        name: 'Tree',          icon: '🌳', rentBonusPerFloor: 0.3,  incomeMultiplier: 0.003, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 100,  costScale: 1.9,  maxCount: 15,  unlockFloors: 1,  fillRateBonus: 0 },
-    { id: 'bench',       name: 'Park Bench',    icon: '🪑', rentBonusPerFloor: 0.2,  incomeMultiplier: 0.005,ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 500,  costScale: 2.1,  maxCount: 10,  unlockFloors: 3,  fillRateBonus: 0 },
-    { id: 'parking',     name: 'Parking Space', icon: '🅿️', rentBonusPerFloor: 0.8,  incomeMultiplier: 0.008, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 2000, costScale: 2.2,  maxCount: 15,  unlockFloors: 5,  fillRateBonus: 0 },
-    { id: 'cafe',        name: 'Café',          icon: '☕', rentBonusPerFloor: 1.0,  incomeMultiplier: 0.02, ownIncome: 100,  ownIncomeFloorScale: 2.0, baseCost: 1000, costScale: 1.45, maxCount: 1,   unlockFloors: 8,  fillRateBonus: 0 },
-    { id: 'restaurant', name: 'Restaurant',    icon: '🍽️', rentBonusPerFloor: 2.0,  incomeMultiplier: 0.03, ownIncome: 500,  ownIncomeFloorScale: 5.0, baseCost: 50000, costScale: 1.50, maxCount: 1,  unlockFloors: 10, fillRateBonus: 0 },
-    { id: 'salon',      name: 'Hair Salon',    icon: '💇', rentBonusPerFloor: 1.5,  incomeMultiplier: 0.02, ownIncome: 200,  ownIncomeFloorScale: 3.0, baseCost: 20000, costScale: 1.45, maxCount: 1,  unlockFloors: 7,  fillRateBonus: 0.05 },
-    { id: 'spa',        name: 'Luxury Spa',    icon: '🧖', rentBonusPerFloor: 3.0,  incomeMultiplier: 0.04, ownIncome: 2000, ownIncomeFloorScale: 10.0, baseCost: 200000, costScale: 1.55, maxCount: 1, unlockFloors: 14, fillRateBonus: 0 },
-    { id: 'fountain',    name: 'Fountain',      icon: '⛲', rentBonusPerFloor: 1.5,  incomeMultiplier: 0.01, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 8000, costScale: 2.5,  maxCount: 8,   unlockFloors: 6,  fillRateBonus: 0 },
-    { id: 'playground',  name: 'Playground',    icon: '🎠', rentBonusPerFloor: 1.0,  incomeMultiplier: 0.008, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 3000, costScale: 2.3,  maxCount: 8,   unlockFloors: 4,  fillRateBonus: 0 },
-    // Fill rate upgrades — get to ~1.2/s by floor 5-6
-    { id: 'billboard',   name: 'Billboard',     icon: '📋', rentBonusPerFloor: 0,    incomeMultiplier: 0,    ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 300,  costScale: 2.0,  maxCount: 10,  unlockFloors: 2,  fillRateBonus: 0.03 },
-    { id: 'busstop',     name: 'Bus Stop',      icon: '🚌', rentBonusPerFloor: 0.1,  incomeMultiplier: 0,    ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 2000, costScale: 2.5,  maxCount: 8,   unlockFloors: 3,  fillRateBonus: 0.06 },
-    { id: 'metrostation',name: 'Metro Station', icon: '🚇', rentBonusPerFloor: 0.5,  incomeMultiplier: 0.02, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 25000,costScale: 3.0,  maxCount: 5,   unlockFloors: 5,  fillRateBonus: 0.12 },
-    // Late-game mega upgrades (unlock after floor 15+)
-    { id: 'heliport',    name: 'Heliport',        icon: '🚁', rentBonusPerFloor: 50,   incomeMultiplier: 0.10, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 1e15,  costScale: 5.0,  maxCount: 10,  unlockFloors: 15, fillRateBonus: 0.5 },
-    { id: 'private_airport', name: 'Private Airport', icon: '✈️', rentBonusPerFloor: 200, incomeMultiplier: 0.15, ownIncome: 0,   ownIncomeFloorScale: 0,   baseCost: 50e15, costScale: 8.0,  maxCount: 5,   unlockFloors: 18, fillRateBonus: 1.0 },
-    { id: 'yacht_club',  name: 'Yacht Club',      icon: '⛵', rentBonusPerFloor: 100,  incomeMultiplier: 0.12, ownIncome: 1e12, ownIncomeFloorScale: 50,  baseCost: 10e15, costScale: 6.0,  maxCount: 8,   unlockFloors: 16, fillRateBonus: 0.3 },
-    { id: 'golf_course', name: 'Golf Course',     icon: '⛳', rentBonusPerFloor: 80,   incomeMultiplier: 0.08, ownIncome: 5e11, ownIncomeFloorScale: 30,  baseCost: 5e15,  costScale: 5.0,  maxCount: 8,   unlockFloors: 14, fillRateBonus: 0.2 },
-    { id: 'shopping_mall', name: 'Shopping Mall',  icon: '🏬', rentBonusPerFloor: 300,  incomeMultiplier: 0.20, ownIncome: 5e12, ownIncomeFloorScale: 100, baseCost: 100e15, costScale: 8.0, maxCount: 5,   unlockFloors: 20, fillRateBonus: 2.0 },
-    { id: 'theme_park',  name: 'Theme Park',      icon: '🎢', rentBonusPerFloor: 500,  incomeMultiplier: 0.25, ownIncome: 10e12, ownIncomeFloorScale: 200, baseCost: 500e15, costScale: 10.0, maxCount: 3, unlockFloors: 22, fillRateBonus: 3.0 },
-    { id: 'space_elevator', name: 'Space Elevator', icon: '🛸', rentBonusPerFloor: 1000, incomeMultiplier: 0.50, ownIncome: 50e12, ownIncomeFloorScale: 500, baseCost: 10e18, costScale: 15.0, maxCount: 3, unlockFloors: 25, fillRateBonus: 5.0 },
-    { id: 'quantum_lab', name: 'Quantum Lab',     icon: '⚛️', rentBonusPerFloor: 2000, incomeMultiplier: 0.40, ownIncome: 100e12, ownIncomeFloorScale: 1000, baseCost: 50e18, costScale: 12.0, maxCount: 3, unlockFloors: 28, fillRateBonus: 8.0 },
-    { id: 'dyson_sphere', name: 'Dyson Sphere',   icon: '☀️', rentBonusPerFloor: 5000, incomeMultiplier: 1.00, ownIncome: 1e15, ownIncomeFloorScale: 5000, baseCost: 500e18, costScale: 20.0, maxCount: 1, unlockFloors: 30, fillRateBonus: 20.0 },
+    { id: 'sidewalk',    name: 'Sidewalk',       icon: '🚶', rentBonusPerTenant: 1,    ownIncome: 0,    baseCost: 500,    costScale: 1.0,  maxCount: 1,   unlockFloors: 1,  fillRateBonus: 0 },
+    { id: 'streetlight', name: 'Streetlight',    icon: '💡', rentBonusPerTenant: 0.3,  ownIncome: 0,    baseCost: 100,    costScale: 1.8,  maxCount: 20,  unlockFloors: 1,  fillRateBonus: 0 },
+    { id: 'tree',        name: 'Tree',           icon: '🌳', rentBonusPerTenant: 0.2,  ownIncome: 0,    baseCost: 50,     costScale: 1.8,  maxCount: 15,  unlockFloors: 1,  fillRateBonus: 0 },
+    { id: 'bench',       name: 'Park Bench',     icon: '🪑', rentBonusPerTenant: 0.3,  ownIncome: 0,    baseCost: 300,    costScale: 2.0,  maxCount: 10,  unlockFloors: 3,  fillRateBonus: 0 },
+    { id: 'playground',  name: 'Playground',     icon: '🎠', rentBonusPerTenant: 0.5,  ownIncome: 0,    baseCost: 2000,   costScale: 2.5,  maxCount: 8,   unlockFloors: 4,  fillRateBonus: 0 },
+    { id: 'parking',     name: 'Parking Space',  icon: '🅿️', rentBonusPerTenant: 0.5,  ownIncome: 0,    baseCost: 5000,   costScale: 2.5,  maxCount: 10,  unlockFloors: 5,  fillRateBonus: 0 },
+    { id: 'fountain',    name: 'Fountain',       icon: '⛲', rentBonusPerTenant: 1,    ownIncome: 0,    baseCost: 10000,  costScale: 3.0,  maxCount: 5,   unlockFloors: 6,  fillRateBonus: 0 },
+    { id: 'billboard',   name: 'Billboard',      icon: '📋', rentBonusPerTenant: 0,    ownIncome: 0,    baseCost: 200,    costScale: 2.0,  maxCount: 10,  unlockFloors: 2,  fillRateBonus: 0.02 },
+    { id: 'busstop',     name: 'Bus Stop',       icon: '🚌', rentBonusPerTenant: 0.1,  ownIncome: 0,    baseCost: 1000,   costScale: 2.5,  maxCount: 8,   unlockFloors: 3,  fillRateBonus: 0.05 },
+    { id: 'metrostation',name: 'Metro Station',  icon: '🚇', rentBonusPerTenant: 0.5,  ownIncome: 0,    baseCost: 15000,  costScale: 3.0,  maxCount: 5,   unlockFloors: 5,  fillRateBonus: 0.10 },
+    { id: 'salon',       name: 'Hair Salon',     icon: '💇', rentBonusPerTenant: 1.5,  ownIncome: 200,  baseCost: 30000,  costScale: 1.0,  maxCount: 1,   unlockFloors: 7,  fillRateBonus: 0.05 },
+    { id: 'cafe',        name: 'Café',           icon: '☕', rentBonusPerTenant: 1,    ownIncome: 100,  baseCost: 50000,  costScale: 1.0,  maxCount: 1,   unlockFloors: 8,  fillRateBonus: 0 },
+    { id: 'restaurant',  name: 'Restaurant',     icon: '🍽️', rentBonusPerTenant: 2,    ownIncome: 500,  baseCost: 500000, costScale: 1.0,  maxCount: 1,   unlockFloors: 10, fillRateBonus: 0 },
+    { id: 'spa',         name: 'Luxury Spa',     icon: '🧖', rentBonusPerTenant: 3,    ownIncome: 2000, baseCost: 5000000,costScale: 1.0,  maxCount: 1,   unlockFloors: 14, fillRateBonus: 0 },
+    { id: 'golf_course', name: 'Golf Course',    icon: '⛳', rentBonusPerTenant: 80,   ownIncome: 0,    baseCost: 5e15,   costScale: 5.0,  maxCount: 8,   unlockFloors: 14, fillRateBonus: 0.2 },
+    { id: 'heliport',    name: 'Heliport',       icon: '🚁', rentBonusPerTenant: 50,   ownIncome: 0,    baseCost: 1e15,   costScale: 5.0,  maxCount: 10,  unlockFloors: 15, fillRateBonus: 0.5 },
+    { id: 'yacht_club',  name: 'Yacht Club',     icon: '⛵', rentBonusPerTenant: 100,  ownIncome: 0,    baseCost: 10e15,  costScale: 6.0,  maxCount: 8,   unlockFloors: 16, fillRateBonus: 0.3 },
+    { id: 'private_airport', name: 'Private Airport', icon: '✈️', rentBonusPerTenant: 200, ownIncome: 0, baseCost: 50e15, costScale: 8.0, maxCount: 5, unlockFloors: 18, fillRateBonus: 1.0 },
+    { id: 'shopping_mall', name: 'Shopping Mall', icon: '🏬', rentBonusPerTenant: 300,  ownIncome: 0,    baseCost: 100e15, costScale: 8.0,  maxCount: 5,   unlockFloors: 20, fillRateBonus: 2.0 },
+    { id: 'theme_park',  name: 'Theme Park',     icon: '🎢', rentBonusPerTenant: 500,  ownIncome: 0,    baseCost: 500e15, costScale: 10.0, maxCount: 3,   unlockFloors: 22, fillRateBonus: 3.0 },
+    { id: 'space_elevator', name: 'Space Elevator', icon: '🛸', rentBonusPerTenant: 1000, ownIncome: 0, baseCost: 10e18, costScale: 15.0, maxCount: 3, unlockFloors: 25, fillRateBonus: 5.0 },
+    { id: 'quantum_lab', name: 'Quantum Lab',    icon: '⚛️', rentBonusPerTenant: 2000, ownIncome: 0,    baseCost: 50e18,  costScale: 12.0, maxCount: 3,   unlockFloors: 28, fillRateBonus: 8.0 },
+    { id: 'dyson_sphere', name: 'Dyson Sphere',  icon: '☀️', rentBonusPerTenant: 5000, ownIncome: 0,    baseCost: 500e18, costScale: 20.0, maxCount: 1,   unlockFloors: 30, fillRateBonus: 20.0 },
   ],
 
   // Business sub-upgrades (per business type)
@@ -236,10 +233,8 @@ interface NeighborhoodDef {
   icon: string;
   description: string;
   model: string | null;
-  rentBonusPerFloor: number;
-  incomeMultiplier: number; // each purchase multiplies total income by (1 + this)
+  rentBonusPerTenant: number;
   ownIncome: number;
-  ownIncomeFloorScale: number;
   baseCost: number;
   costScale: number;
   maxCount: number;
@@ -585,20 +580,14 @@ const neighborhoodModels: THREE.Object3D[] = []; // spawned 3D models
 function getNeighborhoodRentBonus(): number {
   let bonus = 0;
   for (const n of neighborhoodUpgrades) {
-    bonus += n.rentBonusPerFloor * n.count;
+    bonus += n.rentBonusPerTenant * n.count;
   }
   return bonus;
 }
 
 // Global income multiplier from neighborhood — compounds!
 function getGlobalMultiplier(): number {
-  let mult = 1;
-  for (const n of neighborhoodUpgrades) {
-    if (n.incomeMultiplier > 0 && n.count > 0) {
-      mult *= Math.pow(1 + n.incomeMultiplier, n.count);
-    }
-  }
-  return mult;
+  return 1; // income multiplier removed — achievements + prop mgmt handle this
 }
 
 // Per-business sub-upgrade multiplier
@@ -625,11 +614,11 @@ function getBusinessUpgradeCost(businessId: string, index: number): number {
 
 function getNeighborhoodIncome(): number {
   let income = 0;
+  const tenants = getTotalTenants();
   for (const n of neighborhoodUpgrades) {
     if (n.ownIncome > 0 && n.count > 0) {
-      let bizIncome = n.ownIncome * n.count * (1 + state.floorCount * n.ownIncomeFloorScale);
-      bizIncome *= getBusinessUpgradeMultiplier(n.id);
-      income += bizIncome;
+      const bizMult = getBusinessUpgradeMultiplier(n.id);
+      income += n.ownIncome * n.count * Math.max(1, tenants) * bizMult;
     }
   }
   return income;
@@ -924,29 +913,14 @@ function getAverageRentPerTenant(): number {
 // ── Upgrade Costs ────────────────────────────────────────────
 // Amenity cost tiers as multiplier of floor cost (per apartment)
 // Hot Water = 0.15x, Heating = 0.25x, AC = 0.4x, Balcony = 0.6x, Laundry = 0.8x, Gym = 1.2x
-const AMENITY_FLOOR_COST_RATIO: Record<string, number> = {
-  hotwater: 0.15,
-  heating: 0.25,
-  ac: 0.4,
-  balcony: 0.6,
-  laundry: 0.8,
-  gym: 1.2,
-};
-
+// Amenity cost = baseCost × floorCostScale^floor × apartments × studioMult
 function getAmenityCostPerUnit(a: AmenityDef, floorIndex: number): number {
   const floor = state.floorStates[floorIndex];
-  const studioMultiplier = floor ? Math.pow(5, floor.studioLevel) : 1;
-  if (floorIndex === 0) {
-    // Floor 0: use original cheap baseCosts so early game is playable
-    return Math.floor(a.baseCost * studioMultiplier * getEventCostMultiplier());
-  }
-  // Floor 1+: costs scale as fraction of floor cost, always expensive
-  const floorCost = Math.floor(CONFIG.floorBaseCost * Math.pow(CONFIG.floorCostScale, floorIndex));
-  const ratio = AMENITY_FLOOR_COST_RATIO[a.id] || 0.3;
-  return Math.floor(floorCost * ratio * studioMultiplier * getEventCostMultiplier());
+  const studioMult = floor ? Math.pow(CONFIG.studioCostScale, floor.studioLevel) : 1;
+  const floorMult = Math.pow(CONFIG.floorCostScale, floorIndex);
+  return Math.floor(a.baseCost * floorMult * studioMult * getEventCostMultiplier());
 }
 
-// Total cost to install amenity on all remaining apartments on a floor
 function getAmenityFullCost(a: AmenityDef, floorIndex: number): number {
   const floor = state.floorStates[floorIndex];
   if (!floor) return 0;
@@ -956,9 +930,10 @@ function getAmenityFullCost(a: AmenityDef, floorIndex: number): number {
 }
 
 function getStudioCost(floorIndex: number, studioLevel: number): number {
-  const floorCost = Math.floor(CONFIG.floorBaseCost * Math.pow(CONFIG.floorCostScale, Math.max(0, floorIndex)));
-  const floorScaleFactor = (1 + floorIndex * 0.5);
-  return Math.floor(floorCost * 3 * floorScaleFactor * Math.pow(CONFIG.studioCostScale, studioLevel) * getEventCostMultiplier());
+  // Studio cost = total floor upgrade cost × studioCostScale^(level+1)
+  const floorMult = Math.pow(CONFIG.floorCostScale, floorIndex);
+  const totalFloorUpgradeCost = CONFIG.amenities.reduce((sum, a) => sum + a.baseCost, 0) * 10 * floorMult;
+  return Math.floor(totalFloorUpgradeCost * Math.pow(CONFIG.studioCostScale, studioLevel + 1) * getEventCostMultiplier());
 }
 
 function getPenthouseCost(floorIndex: number): number {
@@ -2661,18 +2636,16 @@ function renderNeighborhoodUI() {
       btn.className = 'hood-btn';
       let bonusText = '';
       if (n.fillRateBonus > 0) {
-        bonusText += `<span class="rent-val">+${n.fillRateBonus.toFixed(2)}/s fill rate</span>`;
+        bonusText += `<span class="rent-val">+${n.fillRateBonus.toFixed(2)}/s fill</span>`;
       }
-      if (n.incomeMultiplier > 0) {
+      if (n.rentBonusPerTenant > 0) {
         if (bonusText) bonusText += ' · ';
-        bonusText += `<span class="rent-val">×${((1 + n.incomeMultiplier) * 100 - 100).toFixed(0)}% income</span>`;
-      }
-      if (n.rentBonusPerFloor > 0) {
-        if (bonusText) bonusText += ' · ';
-        bonusText += `<span class="rent-val">+$${n.rentBonusPerFloor}/floor</span>`;
+        bonusText += `<span class="rent-val">+$${n.rentBonusPerTenant}/tenant</span>`;
       }
       if (n.ownIncome > 0) {
-        const incomePreview = n.ownIncome * (1 + state.floorCount * n.ownIncomeFloorScale) * getBusinessUpgradeMultiplier(n.id);
+        const tenants = getTotalTenants();
+        const bizMult = getBusinessUpgradeMultiplier(n.id);
+        const incomePreview = n.ownIncome * Math.max(1, tenants) * bizMult;
         if (bonusText) bonusText += ' · ';
         bonusText += `<span class="rent-val">earns ${formatMoney(incomePreview)}/s</span>`;
       }
@@ -2809,8 +2782,10 @@ function renderUI() {
 
   cityNameDisplay.textContent = currentCityName;
   moneyDisplay.textContent = formatMoney(state.money);
-  const mult = getGlobalMultiplier();
-  incomeDisplay.textContent = formatMoney(income) + '/s' + (mult > 1.01 ? ` (×${mult.toFixed(2)})` : '');
+  const achMult = getAchievementMultiplier();
+  const pmMult = propMgmtLevel > 0 ? PROP_MGMT_LEVELS[propMgmtLevel - 1].multiplier : 1;
+  const totalMult = achMult * pmMult;
+  incomeDisplay.textContent = formatMoney(income) + '/s' + (totalMult > 1.01 ? ` (×${totalMult.toFixed(1)})` : '');
   floorDisplay.textContent = String(state.floorCount);
   rentDisplay.textContent = formatMoney(avgRent) + ' avg';
   fillRateDisplay.textContent = `${fillRate.toFixed(2)}/s`;
