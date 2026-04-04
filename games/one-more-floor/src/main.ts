@@ -36,14 +36,15 @@ const CONFIG = {
   adMaxBoost: 2.0,
   adDecayRate: 0.015,
 
-  // Per-floor amenities — cost = baseCost × floorCostScale^floor × apartments
+  // Per-floor amenities — cost = floorCost × costMultiplier
+  // Each amenity costs a multiple of the floor's own cost
   amenities: [
-    { id: 'hotwater', name: 'Hot Water', icon: '🚿', rentBonus: 1,  baseCost: 2,   costScale: 1.0, unlockFloors: 1 },
-    { id: 'heating',  name: 'Heating',   icon: '🔥', rentBonus: 2,  baseCost: 6,   costScale: 1.0, unlockFloors: 1 },
-    { id: 'ac',       name: 'AC',        icon: '❄️', rentBonus: 4,  baseCost: 20,  costScale: 1.0, unlockFloors: 1 },
-    { id: 'balcony',  name: 'Balcony',   icon: '🌿', rentBonus: 6,  baseCost: 60,  costScale: 1.0, unlockFloors: 1 },
-    { id: 'laundry',  name: 'Laundry',   icon: '👕', rentBonus: 5,  baseCost: 150, costScale: 1.0, unlockFloors: 1 },
-    { id: 'gym',      name: 'Gym',       icon: '💪', rentBonus: 8,  baseCost: 400, costScale: 1.0, unlockFloors: 1 },
+    { id: 'hotwater', name: 'Hot Water', icon: '🚿', rentBonus: 1,  costMultiplier: 1.2, unlockFloors: 1 },
+    { id: 'heating',  name: 'Heating',   icon: '🔥', rentBonus: 2,  costMultiplier: 1.5, unlockFloors: 1 },
+    { id: 'ac',       name: 'AC',        icon: '❄️', rentBonus: 4,  costMultiplier: 2.0, unlockFloors: 1 },
+    { id: 'balcony',  name: 'Balcony',   icon: '🌿', rentBonus: 6,  costMultiplier: 3.0, unlockFloors: 1 },
+    { id: 'laundry',  name: 'Laundry',   icon: '👕', rentBonus: 5,  costMultiplier: 4.0, unlockFloors: 1 },
+    { id: 'gym',      name: 'Gym',       icon: '💪', rentBonus: 8,  costMultiplier: 6.0, unlockFloors: 1 },
   ],
 
   // Neighborhood upgrades — flat rent bonus per tenant + own cost curve
@@ -71,7 +72,9 @@ const CONFIG = {
     { id: 'theme_park',  name: 'Theme Park',     icon: '🎢', rentBonusPerTenant: 500,  ownIncome: 0,    baseCost: 500e15, costScale: 10.0, maxCount: 3,   unlockFloors: 22, fillRateBonus: 3.0 },
     { id: 'space_elevator', name: 'Space Elevator', icon: '🛸', rentBonusPerTenant: 1000, ownIncome: 0, baseCost: 10e18, costScale: 15.0, maxCount: 3, unlockFloors: 25, fillRateBonus: 5.0 },
     { id: 'quantum_lab', name: 'Quantum Lab',    icon: '⚛️', rentBonusPerTenant: 2000, ownIncome: 0,    baseCost: 50e18,  costScale: 12.0, maxCount: 3,   unlockFloors: 28, fillRateBonus: 8.0 },
+    { id: 'ufo_visit',    name: 'UFO Visit',      icon: '🛸', rentBonusPerTenant: 3000, ownIncome: 0,    baseCost: 100e18, costScale: 10.0, maxCount: 3,   unlockFloors: 30, fillRateBonus: 10.0 },
     { id: 'dyson_sphere', name: 'Dyson Sphere',  icon: '☀️', rentBonusPerTenant: 5000, ownIncome: 0,    baseCost: 500e18, costScale: 20.0, maxCount: 1,   unlockFloors: 30, fillRateBonus: 20.0 },
+    { id: 'superman',     name: 'Superman',       icon: '🦸', rentBonusPerTenant: 8000, ownIncome: 0,    baseCost: 1e21,   costScale: 1.0,  maxCount: 1,   unlockFloors: 40, fillRateBonus: 30.0 },
   ],
 
   // Business sub-upgrades (per business type)
@@ -104,7 +107,7 @@ const CONFIG = {
   // Penthouse
   penthouseCost: 500000,
   penthouseRentMultiplier: 10,
-  penthouseMaxTenants: 5,
+  penthouseMaxTenants: 5, // legacy — no longer reduces tenants
   penthouseUpgrades: [
     { id: 'jacuzzi', name: 'Jacuzzi', icon: '🛁', rentBonus: 50, baseCost: 10000, costScale: 1.5 },
     { id: 'skybar', name: 'Sky Bar', icon: '🍸', rentBonus: 80, baseCost: 25000, costScale: 1.6 },
@@ -185,7 +188,7 @@ const CONFIG = {
 
   // Visuals
   moneyPopInterval: 2,       // seconds between money pops
-  moneyPopDuration: 1400,    // ms per pop animation
+  moneyPopDuration: 700,     // ms per pop animation
   uiUpdateInterval: 0.15,    // seconds between DOM content updates
   churnCheckInterval: 3,     // seconds between churn checks
 };
@@ -211,8 +214,7 @@ interface AmenityDef {
   name: string;
   icon: string;
   rentBonus: number;
-  baseCost: number;
-  costScale: number;
+  costMultiplier: number;  // cost as a multiple of the floor cost
   totalInstalled: number;  // global count (kept for compatibility but not used for cost)
   unlockFloors: number;
 }
@@ -559,7 +561,9 @@ const HOOD_VISUALS: Record<string, { description: string; model: string | null; 
   theme_park: { description: 'World-class entertainment', model: null, positions: [] },
   space_elevator: { description: 'Orbital access point', model: null, positions: [] },
   quantum_lab: { description: 'Reality-bending research', model: null, positions: [] },
+  ufo_visit: { description: 'Alien craft orbiting the building', model: null, positions: [] },
   dyson_sphere: { description: 'Harness a star', model: null, positions: [] },
+  superman: { description: 'The man of steel patrols your building', model: null, positions: [] },
 };
 
 // Build neighborhood upgrades by merging CONFIG balance with visuals
@@ -649,6 +653,18 @@ async function spawnNeighborhoodModel(n: NeighborhoodDef) {
   if (n.id === 'sidewalk') {
     sidewalk.visible = true;
     markDirty();
+    return;
+  }
+
+  // UFO: spawn a flying saucer instead of a ground model
+  if (n.id === 'ufo_visit') {
+    spawnUFO(n.count - 1);
+    return;
+  }
+
+  // Superman: single flying figure
+  if (n.id === 'superman') {
+    spawnSuperman();
     return;
   }
 
@@ -911,29 +927,18 @@ function getAverageRentPerTenant(): number {
 }
 
 // ── Upgrade Costs ────────────────────────────────────────────
-// Amenity cost tiers as multiplier of floor cost (per apartment)
-// Hot Water = 0.15x, Heating = 0.25x, AC = 0.4x, Balcony = 0.6x, Laundry = 0.8x, Gym = 1.2x
-// Amenity cost = baseCost × floorCostScale^floor × apartments × studioMult
-function getAmenityCostPerUnit(a: AmenityDef, floorIndex: number): number {
-  const floor = state.floorStates[floorIndex];
-  const studioMult = floor ? Math.pow(CONFIG.studioCostScale, floor.studioLevel) : 1;
-  const floorMult = Math.pow(CONFIG.floorCostScale, floorIndex);
-  return Math.floor(a.baseCost * floorMult * studioMult * getEventCostMultiplier());
-}
-
+// Amenity cost = floorCost × costMultiplier × eventDiscount
+// Each amenity costs a fixed multiple of the floor it's on
 function getAmenityFullCost(a: AmenityDef, floorIndex: number): number {
-  const floor = state.floorStates[floorIndex];
-  if (!floor) return 0;
-  const installed = floor.amenityInstalls.get(a.id) || 0;
-  const missing = floor.maxTenants - installed;
-  return getAmenityCostPerUnit(a, floorIndex) * missing;
+  const floorCost = CONFIG.floorBaseCost * Math.pow(CONFIG.floorCostScale, floorIndex);
+  return Math.floor(floorCost * a.costMultiplier * getEventCostMultiplier());
 }
 
 function getStudioCost(floorIndex: number, studioLevel: number): number {
-  // Studio cost = total floor upgrade cost × studioCostScale^(level+1)
-  const floorMult = Math.pow(CONFIG.floorCostScale, floorIndex);
-  const totalFloorUpgradeCost = CONFIG.amenities.reduce((sum, a) => sum + a.baseCost, 0) * 10 * floorMult;
-  return Math.floor(totalFloorUpgradeCost * Math.pow(CONFIG.studioCostScale, studioLevel + 1) * getEventCostMultiplier());
+  // Studio cost = floorCost × total amenity multipliers × studioCostScale^(level+1)
+  const floorCost = CONFIG.floorBaseCost * Math.pow(CONFIG.floorCostScale, floorIndex);
+  const totalAmenityMult = CONFIG.amenities.reduce((sum, a) => sum + a.costMultiplier, 0);
+  return Math.floor(floorCost * totalAmenityMult * Math.pow(CONFIG.studioCostScale, studioLevel + 1) * getEventCostMultiplier());
 }
 
 function getPenthouseCost(floorIndex: number): number {
@@ -1234,15 +1239,16 @@ function floorsMissingAmenity(a: AmenityDef): number {
   return count;
 }
 
-// Cost to install an amenity on all missing apartments across all floors
+// Cost to install an amenity on all missing floors
 function getBulkAmenityCost(a: AmenityDef): number {
   let total = 0;
   for (let i = 0; i < state.floorCount; i++) {
     const floor = state.floorStates[i];
     if (!floor || floor.isPenthouse) continue;
     const installs = floor.amenityInstalls.get(a.id) || 0;
-    const missing = floor.maxTenants - installs;
-    total += getAmenityCostPerUnit(a, i) * missing;
+    if (installs < floor.maxTenants) {
+      total += getAmenityFullCost(a, i);
+    }
   }
   return total;
 }
@@ -1578,6 +1584,164 @@ function updateWeatherVisuals(eventId: string | null, delta: number) {
   }
 }
 
+// ── UFO Objects ─────────────────────────────────────────────
+const ufoGroup = new THREE.Group();
+const ufos: THREE.Group[] = [];
+
+function createUFO(): THREE.Group {
+  const ufo = new THREE.Group();
+
+  // Saucer body — flattened sphere
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: 0x889999, metalness: 0.9, roughness: 0.15,
+  });
+  const body = new THREE.Mesh(
+    new THREE.SphereGeometry(0.35, 16, 8),
+    bodyMat
+  );
+  body.scale.set(1, 0.25, 1);
+  body.castShadow = true;
+  ufo.add(body);
+
+  // Dome on top — glass cockpit
+  const domeMat = new THREE.MeshStandardMaterial({
+    color: 0x88ffcc, metalness: 0.3, roughness: 0.1,
+    transparent: true, opacity: 0.6,
+  });
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(0.14, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+    domeMat
+  );
+  dome.position.y = 0.06;
+  ufo.add(dome);
+
+  return ufo;
+}
+
+function spawnUFO(index: number) {
+  const ufo = createUFO();
+  ufoGroup.add(ufo);
+  ufos.push(ufo);
+  markDirty();
+}
+
+function updateUFOs(delta: number, time: number) {
+  if (ufos.length === 0) return;
+  const buildingH = (state.floorCount + 1) * actualFloorHeight;
+
+  for (let i = 0; i < ufos.length; i++) {
+    const ufo = ufos[i];
+    const speed = 0.3 + i * 0.15; // slightly different speeds
+    const radius = 1.8 + i * 0.8;  // different orbit radii
+    const heightOffset = 1.5 + i * 1.2; // stacked heights
+    const angle = time * 0.001 * speed + i * (Math.PI * 2 / 3);
+
+    const orbitY = buildingH * 0.5 + heightOffset;
+    ufo.position.set(
+      Math.cos(angle) * radius,
+      orbitY + Math.sin(time * 0.002 + i) * 0.3, // gentle bob
+      Math.sin(angle) * radius
+    );
+    // Tilt slightly into the turn
+    ufo.rotation.z = Math.sin(angle) * 0.15;
+    ufo.rotation.x = Math.cos(angle) * 0.1;
+    // Face direction of travel
+    ufo.rotation.y = -angle + Math.PI / 2;
+  }
+  markDirty();
+}
+
+scene.add(ufoGroup);
+
+// ── Superman Object ─────────────────────────────────────────
+let supermanObj: THREE.Group | null = null;
+let supermanActive = false;
+let supermanX = -12;
+
+function createSuperman(): THREE.Group {
+  const hero = new THREE.Group();
+
+  // Body (blue suit)
+  const bodyMat = new THREE.MeshLambertMaterial({ color: 0x1144cc });
+  const body = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.06, 0.18, 4, 8), bodyMat
+  );
+  body.rotation.z = Math.PI / 2; // flying horizontal
+  body.castShadow = true;
+  hero.add(body);
+
+  // Head (skin tone)
+  const headMat = new THREE.MeshLambertMaterial({ color: 0xf5c6a0 });
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.05, 8, 8), headMat
+  );
+  head.position.set(0.18, 0.02, 0);
+  hero.add(head);
+
+  // Cape (red, trails behind)
+  const capeMat = new THREE.MeshLambertMaterial({ color: 0xcc1111, side: THREE.DoubleSide });
+  const cape = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.25, 0.15), capeMat
+  );
+  cape.position.set(-0.15, 0.02, 0);
+  cape.rotation.y = Math.PI / 2;
+  cape.rotation.x = -0.3;
+  hero.add(cape);
+
+  // Red boots
+  const bootMat = new THREE.MeshLambertMaterial({ color: 0xcc1111 });
+  const bootL = new THREE.Mesh(
+    new THREE.BoxGeometry(0.06, 0.035, 0.035), bootMat
+  );
+  bootL.position.set(-0.1, -0.04, 0.03);
+  hero.add(bootL);
+  const bootR = bootL.clone();
+  bootR.position.set(-0.1, -0.04, -0.03);
+  hero.add(bootR);
+
+  // Outstretched fist (front hand)
+  const fistMat = new THREE.MeshLambertMaterial({ color: 0xf5c6a0 });
+  const fist = new THREE.Mesh(
+    new THREE.SphereGeometry(0.025, 6, 6), fistMat
+  );
+  fist.position.set(0.26, 0.02, 0);
+  hero.add(fist);
+
+  return hero;
+}
+
+function spawnSuperman() {
+  if (supermanObj) return; // already exists
+  supermanObj = createSuperman();
+  supermanX = -12;
+  supermanActive = true;
+  scene.add(supermanObj);
+  markDirty();
+}
+
+function updateSuperman(delta: number, time: number) {
+  if (!supermanObj || !supermanActive) return;
+  const buildingH = (state.floorCount + 1) * actualFloorHeight;
+
+  // Fly from left to right
+  supermanX += 2.5 * delta;
+  if (supermanX > 12) {
+    supermanX = -12;
+  }
+
+  // Fly at ~60-70% building height, slight sine wave for organic motion
+  const flyY = buildingH * 0.65 + Math.sin(time * 0.0015) * 0.4;
+  const flyZ = 1.5 + Math.sin(time * 0.001) * 0.3; // slight z-drift towards camera
+  supermanObj.position.set(supermanX, flyY, flyZ);
+
+  // Slight pitch variation — nose up/down gently
+  supermanObj.rotation.z = Math.sin(time * 0.002) * 0.08;
+  // Cape flutter effect — rotate x slightly
+  supermanObj.rotation.x = Math.sin(time * 0.004) * 0.05;
+
+  markDirty();
+}
+
 const groundGeo = new THREE.PlaneGeometry(20, 20);
 const groundMat = new THREE.MeshLambertMaterial({ color: 0x5a8a4a });
 const ground = new THREE.Mesh(groundGeo, groundMat);
@@ -1609,6 +1773,7 @@ let actualFloorHeight = 1.0;
 const loader = new GLTFLoader();
 const buildingGroup = new THREE.Group();
 scene.add(buildingGroup);
+const floorModels: THREE.Object3D[] = []; // indexed by floor number
 
 const modelCache: Map<string, THREE.Group> = new Map();
 
@@ -1641,6 +1806,7 @@ async function initBuilding() {
   const groundFloor = await loadModel('models/building-door.glb');
   groundFloor.position.y = 0;
   buildingGroup.add(groundFloor);
+  floorModels[0] = groundFloor;
 
   const box = new THREE.Box3().setFromObject(groundFloor);
   const size = box.getSize(new THREE.Vector3());
@@ -1674,7 +1840,7 @@ async function processQueue() {
       buildingGroup.remove(roofModel);
     }
 
-    const floorModels = [
+    const floorModelPaths = [
       'models/building-window.glb',
       'models/building-windows.glb',
       'models/building-window-balcony.glb',
@@ -1682,11 +1848,12 @@ async function processQueue() {
       'models/building-window-sill.glb',
     ];
 
-    const modelPath = floorModels[(floorNum - 2) % floorModels.length];
+    const modelPath = floorModelPaths[(floorNum - 2) % floorModelPaths.length];
     const newFloor = await loadModel(modelPath);
     const floorY = (floorNum - 1) * actualFloorHeight;
     newFloor.position.y = floorY;
     buildingGroup.add(newFloor);
+    floorModels[floorNum - 1] = newFloor;
 
     visualFloorCount = floorNum;
 
@@ -1702,20 +1869,115 @@ async function processQueue() {
 }
 
 function convertFloorToGold(floorIndex: number) {
-  // The building group's children are: ground floor model, floor models, roof
-  // floorIndex 0 = ground floor (child 0), floorIndex N = child N
-  const child = buildingGroup.children[floorIndex];
+  const child = floorModels[floorIndex];
   if (child) {
     child.traverse((node) => {
       if ((node as THREE.Mesh).isMesh) {
         const mesh = node as THREE.Mesh;
         if (mesh.material) {
-          mesh.material = new THREE.MeshLambertMaterial({ color: 0xd4a574 });
+          // Clone material to avoid affecting other floors, then apply golden tint
+          const orig = mesh.material as THREE.MeshStandardMaterial | THREE.MeshLambertMaterial;
+          const mat = orig.clone() as THREE.MeshStandardMaterial;
+          // Tint the existing color toward gold
+          if (mat.color) mat.color.lerp(new THREE.Color(0xffd700), 0.4);
+          if ('emissive' in mat) {
+            mat.emissive = new THREE.Color(0xffa500);
+            mat.emissiveIntensity = 0.15;
+          }
+          if ('metalness' in mat) mat.metalness = Math.min(1, (mat.metalness || 0) + 0.3);
+          if ('roughness' in mat) mat.roughness = Math.max(0, (mat.roughness || 1) - 0.2);
+          mesh.material = mat;
         }
       }
     });
+
+    // Add sparkle particles to left and right sides of the penthouse floor
+    const sparkCount = 10;
+    const sparkGeo = new THREE.BufferGeometry();
+    const sparkPos = new Float32Array(sparkCount * 3);
+    for (let i = 0; i < sparkCount; i++) {
+      const side = i < sparkCount / 2 ? -1 : 1;
+      sparkPos[i * 3] = side * (0.4 + Math.random() * 0.3);
+      sparkPos[i * 3 + 1] = floorIndex * actualFloorHeight + Math.random() * actualFloorHeight;
+      sparkPos[i * 3 + 2] = (Math.random() - 0.5) * 0.4;
+    }
+    sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
+    const sparkMat = new THREE.PointsMaterial({
+      map: sparkleTexture, color: 0xffd700,
+      size: 0.15, transparent: true, opacity: 0.9,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+    const sparkles = new THREE.Points(sparkGeo, sparkMat);
+    buildingGroup.add(sparkles);
+    penthouseSparkles.push({ points: sparkles, floorIndex });
+
     markDirty();
   }
+}
+
+// Generate a sparkle texture via canvas — 4-pointed star with glow
+const sparkleTexture = (() => {
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  const cx = size / 2, cy = size / 2;
+
+  // Soft radial glow
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, size / 2);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.1, 'rgba(255,215,0,0.8)');
+  grad.addColorStop(0.4, 'rgba(255,215,0,0.15)');
+  grad.addColorStop(1, 'rgba(255,215,0,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+
+  // Cross flare
+  ctx.globalCompositeOperation = 'lighter';
+  for (const angle of [0, Math.PI / 2]) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+    const flare = ctx.createLinearGradient(-size / 2, 0, size / 2, 0);
+    flare.addColorStop(0, 'rgba(255,215,0,0)');
+    flare.addColorStop(0.4, 'rgba(255,255,200,0.6)');
+    flare.addColorStop(0.5, 'rgba(255,255,255,1)');
+    flare.addColorStop(0.6, 'rgba(255,255,200,0.6)');
+    flare.addColorStop(1, 'rgba(255,215,0,0)');
+    ctx.fillStyle = flare;
+    ctx.fillRect(-size / 2, -2, size, 4);
+    ctx.restore();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  return tex;
+})();
+
+const penthouseSparkles: { points: THREE.Points; floorIndex: number }[] = [];
+
+function updatePenthouseSparkles(time: number) {
+  for (const s of penthouseSparkles) {
+    const pos = s.points.geometry.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < pos.count; i++) {
+      // Gentle float upward
+      pos.array[i * 3 + 1] += 0.002;
+      const floorTop = (s.floorIndex + 1) * actualFloorHeight;
+      const floorBottom = s.floorIndex * actualFloorHeight;
+      if (pos.array[i * 3 + 1] > floorTop) {
+        // Reset to bottom of floor, random side position
+        const side = Math.random() > 0.5 ? 1 : -1;
+        pos.array[i * 3] = side * (0.4 + Math.random() * 0.3);
+        pos.array[i * 3 + 1] = floorBottom + Math.random() * 0.1;
+        pos.array[i * 3 + 2] = (Math.random() - 0.5) * 0.4;
+      }
+    }
+    pos.needsUpdate = true;
+    // Global twinkle
+    (s.points.material as THREE.PointsMaterial).opacity = 0.6 + Math.sin(time * 0.005 + s.floorIndex) * 0.3;
+  }
+  if (penthouseSparkles.length > 0) markDirty();
 }
 
 // ── Tenants (walking figures) ───────────────────────────────
@@ -1932,7 +2194,7 @@ function updateMoneyPops() {
       continue;
     }
     if (t < 0) continue; // delayed, not started yet
-    const dist = t * 80;
+    const dist = t * 35;
     const x = pop.sx + Math.cos(pop.angle) * dist;
     const y = pop.sy + Math.sin(pop.angle) * dist;
     pop.el.style.left = `${x}px`;
@@ -1982,28 +2244,19 @@ function tickMoneyPops(delta: number) {
     const totalIncome = getTotalRentPerSecond();
     const incomeLevel = Math.min(1, Math.log10(Math.max(1, totalIncome)) / 6);
     playCashSound(incomeLevel);
-    // Only pop from max 3 random floors per tick to limit DOM creation
     const occupiedFloors: number[] = [];
     for (let i = 0; i < state.floorCount; i++) {
       if (state.floorStates[i] && state.floorStates[i].tenants > 0) occupiedFloors.push(i);
     }
-    // Shuffle and take first 3
-    for (let i = occupiedFloors.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [occupiedFloors[i], occupiedFloors[j]] = [occupiedFloors[j], occupiedFloors[i]];
-    }
-    const popFloors = occupiedFloors.slice(0, 3);
-    let popCount = 0;
+    const popFloors = occupiedFloors;
     for (const fi of popFloors) {
-      spawnMoneyPopStaggered(fi, popCount * 80);
-      popCount++;
+      spawnMoneyPop(fi);
     }
-    // Pop from first 3 cafés
+    // Pop from cafés
     const cafeDef = neighborhoodUpgrades.find(n => n.id === 'cafe');
     if (cafeDef && cafeDef.count > 0) {
-      const maxCafePops = Math.min(cafeDef.count, 3);
-      for (let i = 0; i < maxCafePops; i++) {
-        spawnCafePopStaggered(i, (popCount + i) * 80);
+      for (let i = 0; i < cafeDef.count; i++) {
+        spawnCafePop(i);
       }
     }
   }
@@ -2092,8 +2345,7 @@ function ensureFloorPanels() {
         if (state.money >= cost) {
           state.money -= cost;
           floor.isPenthouse = true;
-          floor.maxTenants = CONFIG.penthouseMaxTenants;
-          floor.tenants = Math.min(floor.tenants, floor.maxTenants);
+          // Keep existing tenants and slots — penthouse is a prestige upgrade, not a downgrade
           convertFloorToGold(floorIndex);
           triggerGlow('gold', 2000);
           playAchievementSound();
@@ -2157,27 +2409,10 @@ function updateFloorPanelPositions() {
     }
   }
 
-  // Hide panels that would overlap (need vertical clearance)
-  const MIN_GAP = isMobile() ? 20 : 40;
-  const visible = new Set<number>();
-  // Process bottom-to-top (highest sy first = lowest floor)
-  positions.sort((a, b) => b.sy - a.sy);
-  let lastVisibleY = Infinity;
-  for (const pos of positions) {
-    if (lastVisibleY - pos.sy >= MIN_GAP) {
-      visible.add(pos.index);
-      lastVisibleY = pos.sy;
-    }
-  }
-
   for (const pos of positions) {
     const panel = floorPanels[pos.index];
-    if (visible.has(pos.index)) {
-      panel.el.style.transform = `translate(-100%, -50%) translate(${pos.sx}px, ${pos.sy}px)`;
-      panel.el.style.opacity = '1';
-    } else {
-      panel.el.style.opacity = '0';
-    }
+    panel.el.style.transform = `translate(-100%, -50%) translate(${pos.sx}px, ${pos.sy}px)`;
+    panel.el.style.opacity = '1';
   }
 }
 
@@ -2427,6 +2662,7 @@ floorBtn.addEventListener('click', () => {
 shopEl.appendChild(floorBtn);
 
 // ── Hire Agents Button ────────────────────────────────────────
+let hireLastClick = 0;
 const hireBtn = document.createElement('button');
 hireBtn.className = 'shop-btn hire-btn';
 hireBtn.innerHTML = `
@@ -2436,6 +2672,7 @@ hireBtn.innerHTML = `
 hireBtn.addEventListener('click', () => {
   const cost = getAdCost();
   if (state.money >= cost) {
+    hireLastClick = Date.now();
     state.money -= cost;
     state.adBoost = Math.min(CONFIG.adMaxBoost, state.adBoost + CONFIG.adBoostPerClick);
     state.adTimer = CONFIG.adBoostMaxDuration;
@@ -2510,6 +2747,40 @@ bulkStudioBtn.addEventListener('click', () => {
   renderUI();
 });
 bulkEl.appendChild(bulkStudioBtn);
+
+// Bulk penthouse button — convert top floor or buy next penthouse upgrade
+const bulkPenthouseBtn = document.createElement('button');
+bulkPenthouseBtn.className = 'bulk-btn';
+bulkPenthouseBtn.addEventListener('click', () => {
+  const topIdx = state.floorCount - 1;
+  const floor = state.floorStates[topIdx];
+  if (!floor) return;
+
+  if (floor.isPenthouse) {
+    // Buy next penthouse upgrade
+    const nextPU = getNextPenthouseUpgrade(topIdx);
+    if (!nextPU) return;
+    const cost = getPenthouseUpgradeCost(nextPU.id, topIdx);
+    if (state.money < cost || cost <= 0) return;
+    state.money -= cost;
+    floor.penthouseAmenityInstalls.set(nextPU.id, floor.maxTenants);
+    playUpgradeSound();
+  } else if (isFloorFullyUpgraded(topIdx)) {
+    // Convert to penthouse
+    const cost = getConvertToPenthouseCost(topIdx);
+    if (state.money < cost) return;
+    state.money -= cost;
+    floor.isPenthouse = true;
+    convertFloorToGold(topIdx);
+    triggerGlow('gold', 2000);
+    playAchievementSound();
+  } else {
+    return; // not ready
+  }
+  invalidateUpgradeCache();
+  renderUI();
+});
+bulkEl.appendChild(bulkPenthouseBtn);
 
 // ── Neighborhood Upgrade Buttons (right panel) ──────────────
 const hoodEl = document.getElementById('neighborhood-upgrades')!;
@@ -2648,10 +2919,19 @@ function renderBusinessUI() {
   }
 }
 
+function areFloorsMaxedUpTo(floorCount: number): boolean {
+  for (let i = 0; i < Math.min(floorCount, state.floorCount); i++) {
+    if (!isFloorComplete(i)) return false;
+  }
+  return true;
+}
+
 function renderNeighborhoodUI() {
   for (const n of neighborhoodUpgrades) {
     const btn = hoodButtons.get(n.id)!;
-    if (state.floorCount < n.unlockFloors) {
+    // Only reveal when we have enough floors AND all floors up to unlock are maxed
+    // Already-purchased items stay visible
+    if (state.floorCount < n.unlockFloors || (n.count === 0 && !areFloorsMaxedUpTo(n.unlockFloors))) {
       btn.style.display = 'none';
       continue;
     }
@@ -2870,15 +3150,17 @@ function renderUI() {
     }
   }
 
-  // Vacancy section + Hire Agents — always visible, disabled when full
+  // Vacancy section + Hire Agents — only show when occupancy drops below 90%
   {
     const totalTenants = getTotalTenants();
     const totalSlots = getTotalSlots();
-    const allOccupied = totalTenants >= totalSlots;
+    const occupancy = totalSlots > 0 ? totalTenants / totalSlots : 1;
+    const recentlyClicked = Date.now() - hireLastClick < 5000;
+    const showHire = occupancy < 0.9 || recentlyClicked;
     const adCost = getAdCost();
-    const canAffordAd = state.money >= adCost && !allOccupied;
+    const canAffordAd = state.money >= adCost && showHire;
     hireBtn.disabled = !canAffordAd;
-    if (allOccupied) {
+    if (!showHire) {
       hireBtn.style.opacity = '0.4';
       hireBtn.style.pointerEvents = 'none';
     } else {
@@ -2967,6 +3249,66 @@ function renderUI() {
             <span class="bulk-detail"><span class="cost-val">${formatMoney(cost)}</span> · <span class="count-val">${studioNeeding} floors</span></span>
           </span>
         `;
+      }
+    }
+
+    // Bulk penthouse button
+    const topIdx = state.floorCount - 1;
+    const topFloor = state.floorStates[topIdx];
+    if (topFloor) {
+      if (topFloor.isPenthouse) {
+        const nextPU = getNextPenthouseUpgrade(topIdx);
+        if (!nextPU) {
+          bulkPenthouseBtn.disabled = true;
+          bulkPenthouseBtn.className = 'bulk-btn all-done';
+          const key = 'ph:done';
+          if (bulkPenthouseBtn.dataset.key !== key) {
+            bulkPenthouseBtn.dataset.key = key;
+            bulkPenthouseBtn.innerHTML = `
+              <span class="bulk-icon">🏰</span>
+              <span class="bulk-info">
+                <span class="bulk-name">Penthouse</span>
+                <span class="bulk-detail">All upgrades installed &#x2713;</span>
+              </span>
+            `;
+          }
+        } else {
+          const cost = getPenthouseUpgradeCost(nextPU.id, topIdx);
+          const canAfford = state.money >= cost;
+          bulkPenthouseBtn.disabled = !canAfford;
+          bulkPenthouseBtn.className = 'bulk-btn';
+          const key = `ph:${nextPU.id}:${formatMoney(cost)}`;
+          if (bulkPenthouseBtn.dataset.key !== key) {
+            bulkPenthouseBtn.dataset.key = key;
+            bulkPenthouseBtn.innerHTML = `
+              <span class="bulk-icon">🏰</span>
+              <span class="bulk-info">
+                <span class="bulk-name">${nextPU.name}</span>
+                <span class="bulk-detail"><span class="cost-val">${formatMoney(cost)}</span> · <span class="rent-val">+$${nextPU.rentBonus}/tenant</span></span>
+              </span>
+            `;
+          }
+        }
+        bulkPenthouseBtn.style.display = '';
+      } else if (isFloorFullyUpgraded(topIdx)) {
+        const cost = getConvertToPenthouseCost(topIdx);
+        const canAfford = state.money >= cost;
+        bulkPenthouseBtn.disabled = !canAfford;
+        bulkPenthouseBtn.className = 'bulk-btn';
+        const key = `ph:convert:${formatMoney(cost)}`;
+        if (bulkPenthouseBtn.dataset.key !== key) {
+          bulkPenthouseBtn.dataset.key = key;
+          bulkPenthouseBtn.innerHTML = `
+            <span class="bulk-icon">🏰</span>
+            <span class="bulk-info">
+              <span class="bulk-name">Penthouse Suite</span>
+              <span class="bulk-detail"><span class="cost-val">${formatMoney(cost)}</span> · 10x floor rent</span>
+            </span>
+          `;
+        }
+        bulkPenthouseBtn.style.display = '';
+      } else {
+        bulkPenthouseBtn.style.display = 'none';
       }
     }
   }
@@ -3245,6 +3587,21 @@ function gameLoop(time: number) {
   const eventId = state.activeEvent?.event.id ?? null;
   updateWeatherVisuals(eventId, visualDelta);
 
+  // ── UFO animation ──
+  if (ufos.length > 0) {
+    updateUFOs(visualDelta, frameTime);
+  }
+
+  // ── Superman animation ──
+  if (supermanActive) {
+    updateSuperman(visualDelta, frameTime);
+  }
+
+  // ── Penthouse sparkles ──
+  if (penthouseSparkles.length > 0) {
+    updatePenthouseSparkles(frameTime);
+  }
+
   // ── Camera animation (BEFORE panel positions so projections use current camera) ──
   const camDist = camera.position.distanceTo(cameraTargetPos);
   if (camDist > 0.01) {
@@ -3349,18 +3706,21 @@ async function rebuildBuildingFromState() {
   while (buildingGroup.children.length > 0) {
     buildingGroup.remove(buildingGroup.children[0]);
   }
+  floorModels.length = 0;
+  penthouseSparkles.length = 0;
 
   // Rebuild ground floor
   const groundFloor = await loadModel('models/building-door.glb');
   groundFloor.position.y = 0;
   buildingGroup.add(groundFloor);
+  floorModels[0] = groundFloor;
 
   const box = new THREE.Box3().setFromObject(groundFloor);
   const size = box.getSize(new THREE.Vector3());
   actualFloorHeight = size.y;
 
   // Add additional floors
-  const floorModels = [
+  const floorModelPaths = [
     'models/building-window.glb',
     'models/building-windows.glb',
     'models/building-window-balcony.glb',
@@ -3369,10 +3729,11 @@ async function rebuildBuildingFromState() {
   ];
 
   for (let i = 1; i < state.floorCount; i++) {
-    const modelPath = floorModels[(i - 1) % floorModels.length];
+    const modelPath = floorModelPaths[(i - 1) % floorModelPaths.length];
     const newFloor = await loadModel(modelPath);
     newFloor.position.y = i * actualFloorHeight;
     buildingGroup.add(newFloor);
+    floorModels[i] = newFloor;
   }
 
   // Add roof
@@ -3395,8 +3756,8 @@ async function rebuildBuildingFromState() {
     const savedCount = n.count;
     for (let i = 0; i < savedCount; i++) {
       n.count = i + 1;
-      // Only spawn visual if within position limit or every 5th
-      if (n.count <= n.positions.length || n.count % 5 === 0) {
+      // Only spawn visual if within position limit or every 5th (UFOs/Superman always spawn)
+      if (n.id === 'ufo_visit' || n.id === 'superman' || n.count <= n.positions.length || n.count % 5 === 0) {
         await spawnNeighborhoodModel(n);
       }
     }
@@ -3410,9 +3771,15 @@ async function rebuildBuildingFromState() {
     }
   }
 
-  // Convert penthouse floors to gold
+  // Convert penthouse floors to gold + migrate old saves with reduced tenants
   for (let i = 0; i < state.floorStates.length; i++) {
     if (state.floorStates[i].isPenthouse) {
+      // Old saves set maxTenants to 5 — restore to studio-based value
+      const floor = state.floorStates[i];
+      const expectedMax = getTotalMaxTenants(floor.studioLevel);
+      if (floor.maxTenants < expectedMax) {
+        floor.maxTenants = expectedMax;
+      }
       convertFloorToGold(i);
     }
   }
