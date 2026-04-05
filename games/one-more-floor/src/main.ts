@@ -2063,11 +2063,11 @@ function updateCamera() {
   const distance = Math.max(8, buildingHeight * 1.2 + 6);
 
   if (isMobile()) {
-    // Front-facing, building base near bottom of screen
-    const zoom = distance * 1.0;
+    // Front-facing, building base near bottom of screen — zoom out more
+    const zoom = distance * 0.95;
     const liftY = zoom * 0.25; // shift camera up so building appears lower
-    cameraTargetPos.set(zoom * 0.15, lookAtY + zoom * 0.15 + liftY, zoom);
-    cameraTargetLookAt.set(zoom * 0.1, lookAtY - zoom * 0.05 + liftY, 0);
+    cameraTargetPos.set(zoom * 0.05, lookAtY + zoom * 0.15 + liftY, zoom);
+    cameraTargetLookAt.set(zoom * 0.0, lookAtY - zoom * 0.05 + liftY, 0);
   } else {
     cameraTargetPos.set(distance * 0.15, lookAtY + distance * 0.3, distance);
     cameraTargetLookAt.set(0, lookAtY, 0);
@@ -2402,8 +2402,10 @@ function updateFloorPanelPositions() {
 
     // Clamp sy so panels near bottom edge stay visible instead of being hidden
     const clampedSy = Math.min(sy, window.innerHeight - 30);
-    if (worldPos.z > 0 && worldPos.z < 1 && sx > 50 && sx < window.innerWidth - 50 && clampedSy > 10) {
-      positions.push({ index: i, sx, sy: clampedSy });
+    const minX = isMobile() ? -50 : 50;
+    const maxX = isMobile() ? window.innerWidth : window.innerWidth - 50;
+    if (worldPos.z > 0 && worldPos.z < 1 && sx > minX && sx < maxX && clampedSy > 10) {
+      positions.push({ index: i, sx: Math.max(10, sx), sy: clampedSy });
     } else {
       panel.el.style.opacity = '0';
     }
@@ -2455,13 +2457,13 @@ function updateFloorPanelContent() {
         const key = `ph:${nextPU.id}:${formatMoney(cost)}:f${i}`;
         if (panel.buyBtn.dataset.key !== key) {
           panel.buyBtn.dataset.key = key;
-          panel.buyBtn.innerHTML = `
-            <span class="btn-icon">${nextPU.icon}</span>
-            <span class="btn-info">
-              <span class="btn-name">${nextPU.name}</span>
-              <span class="btn-detail"><span class="cost-val">${formatMoney(cost)}</span> · <span class="rent-val">+$${nextPU.rentBonus}/tenant</span></span>
-            </span>
-          `;
+          panel.buyBtn.innerHTML = mobile
+            ? `<span class="btn-icon">${nextPU.icon}</span><span class="btn-detail"><span class="cost-val">${formatMoney(cost)}</span></span>`
+            : `<span class="btn-icon">${nextPU.icon}</span>
+              <span class="btn-info">
+                <span class="btn-name">${nextPU.name}</span>
+                <span class="btn-detail"><span class="cost-val">${formatMoney(cost)}</span> · <span class="rent-val">+$${nextPU.rentBonus}/tenant</span></span>
+              </span>`;
         }
         panel.buyBtn.classList.toggle('affordable', canAfford);
       } else {
@@ -2508,13 +2510,13 @@ function updateFloorPanelContent() {
       const key = `${next.id}:${formatMoney(cost)}:f${i}:m${floor.maxTenants}`;
       if (panel.buyBtn.dataset.key !== key) {
         panel.buyBtn.dataset.key = key;
-        panel.buyBtn.innerHTML = `
-          ${mobile ? '' : `<span class="btn-icon">${next.icon}</span>`}
+        panel.buyBtn.innerHTML = mobile
+        ? `<span class="btn-icon">${next.icon}</span><span class="btn-detail"><span class="cost-val">${formatMoney(cost)}</span></span>`
+        : `<span class="btn-icon">${next.icon}</span>
           <span class="btn-info">
             <span class="btn-name">${next.name}</span>
             <span class="btn-detail"><span class="cost-val">${formatMoney(cost)}</span> · <span class="rent-val">+$${next.rentBonus}/tenant</span></span>
-          </span>
-        `;
+          </span>`;
       }
       panel.buyBtn.classList.toggle('affordable', canAfford);
     } else if (fullyUpgraded && i === state.floorCount - 1 && !floor.isPenthouse && !floor.hasPenthouse) {
@@ -2526,13 +2528,13 @@ function updateFloorPanelContent() {
       const key = `convertph:${formatMoney(cost)}:f${i}`;
       if (panel.buyBtn.dataset.key !== key) {
         panel.buyBtn.dataset.key = key;
-        panel.buyBtn.innerHTML = `
-          <span class="btn-icon">🥂</span>
-          <span class="btn-info">
-            <span class="btn-name">Penthouse</span>
-            <span class="btn-detail"><span class="cost-val">${formatMoney(cost)}</span> · <span class="rent-val">${CONFIG.penthouseRentMultiplier}x rent</span></span>
-          </span>
-        `;
+        panel.buyBtn.innerHTML = mobile
+          ? `<span class="btn-icon">🥂</span><span class="btn-detail"><span class="cost-val">${formatMoney(cost)}</span></span>`
+          : `<span class="btn-icon">🥂</span>
+            <span class="btn-info">
+              <span class="btn-name">Penthouse</span>
+              <span class="btn-detail"><span class="cost-val">${formatMoney(cost)}</span> · <span class="rent-val">${CONFIG.penthouseRentMultiplier}x rent</span></span>
+            </span>`;
       }
       panel.buyBtn.classList.toggle('affordable', canAfford);
     } else if (fullyUpgraded && floor.studioLevel < CONFIG.maxStudioLevel && !floor.isPenthouse) {
@@ -2545,13 +2547,13 @@ function updateFloorPanelContent() {
       const key = `studio:${floor.studioLevel}:${formatMoney(cost)}:f${i}`;
       if (panel.buyBtn.dataset.key !== key) {
         panel.buyBtn.dataset.key = key;
-        panel.buyBtn.innerHTML = `
-          <span class="btn-icon">🏠</span>
-          <span class="btn-info">
-            <span class="btn-name">Studios Lv${floor.studioLevel + 1}</span>
-            <span class="btn-detail"><span class="cost-val">${formatMoney(cost)}</span> · <span class="rent-val">+${addition} slots</span></span>
-          </span>
-        `;
+        panel.buyBtn.innerHTML = mobile
+          ? `<span class="btn-icon">🏠</span><span class="btn-detail"><span class="cost-val">${formatMoney(cost)}</span></span>`
+          : `<span class="btn-icon">🏠</span>
+            <span class="btn-info">
+              <span class="btn-name">Studios Lv${floor.studioLevel + 1}</span>
+              <span class="btn-detail"><span class="cost-val">${formatMoney(cost)}</span> · <span class="rent-val">+${addition} slots</span></span>
+            </span>`;
       }
       panel.buyBtn.classList.toggle('affordable', canAfford);
     } else if (complete && !floor.hasPenthouse && i >= PENTHOUSE_UNLOCK_FLOOR) {
@@ -2563,13 +2565,13 @@ function updateFloorPanelContent() {
       const key = `penthouse:${formatMoney(cost)}:f${i}`;
       if (panel.buyBtn.dataset.key !== key) {
         panel.buyBtn.dataset.key = key;
-        panel.buyBtn.innerHTML = `
-          <span class="btn-icon">🏰</span>
-          <span class="btn-info">
-            <span class="btn-name">Penthouse Suite</span>
-            <span class="btn-detail"><span class="cost-val">${formatMoney(cost)}</span> · <span class="rent-val">${PENTHOUSE_MULTIPLIER}x floor income</span></span>
-          </span>
-        `;
+        panel.buyBtn.innerHTML = mobile
+          ? `<span class="btn-icon">🏰</span><span class="btn-detail"><span class="cost-val">${formatMoney(cost)}</span></span>`
+          : `<span class="btn-icon">🏰</span>
+            <span class="btn-info">
+              <span class="btn-name">Penthouse Suite</span>
+              <span class="btn-detail"><span class="cost-val">${formatMoney(cost)}</span> · <span class="rent-val">${PENTHOUSE_MULTIPLIER}x floor income</span></span>
+            </span>`;
       }
       panel.buyBtn.classList.toggle('affordable', canAfford);
     } else {
@@ -3709,6 +3711,20 @@ async function rebuildBuildingFromState() {
   floorModels.length = 0;
   penthouseSparkles.length = 0;
 
+  // Clear floor panel DOM elements
+  while (floorPanels.length > 0) {
+    const p = floorPanels.pop()!;
+    p.el.remove();
+  }
+
+  // Clear neighborhood models from scene
+  for (const obj of neighborhoodModels) {
+    scene.remove(obj);
+  }
+  neighborhoodModels.length = 0;
+  sidewalk.visible = false;
+  achievementSignPositions.length = 0;
+
   // Rebuild ground floor
   const groundFloor = await loadModel('models/building-door.glb');
   groundFloor.position.y = 0;
@@ -4005,13 +4021,80 @@ function showLoadingOnStartScreen() {
   startButtons.appendChild(msg);
 }
 
+function resetGameState() {
+  // Reset core state
+  state.money = 0;
+  state.floorCount = 1;
+  state.floorStates = [makeFloorState(1)];
+  state.adBoost = 0;
+  state.adTimer = 0;
+  state.adClicks = 0;
+  state.activeEvent = null;
+  state.eventCooldown = 30;
+  state.totalMoneyEarned = 0;
+  state.totalStudios = 0;
+  state.totalEvents = 0;
+
+  // Reset upgrade state
+  propMgmtLevel = 0;
+  bulkPhaseUnlocked = false;
+  peakMoney = 0;
+  floorsPurchased = 0;
+
+  // Reset neighborhood upgrades
+  for (const n of neighborhoodUpgrades) {
+    n.count = 0;
+  }
+  // Remove neighborhood 3D models from scene
+  for (const obj of neighborhoodModels) {
+    scene.remove(obj);
+  }
+  neighborhoodModels.length = 0;
+  sidewalk.visible = false;
+
+  // Remove achievement sign models from scene
+  for (const pos of achievementSignPositions) {
+    // Signs are added directly to scene — we rebuild them below
+    // They'll be re-added by rebuildBuildingFromState
+  }
+  achievementSignPositions.length = 0;
+
+  // Reset business upgrade levels
+  for (const levels of Object.values(businessUpgradeState)) {
+    for (const st of levels) {
+      st.level = 0;
+    }
+  }
+
+  // Reset amenity totalInstalled counts
+  for (const a of amenities) {
+    a.totalInstalled = 0;
+  }
+
+  // Remove excess floor panel DOM elements
+  while (floorPanels.length > 0) {
+    const p = floorPanels.pop()!;
+    p.el.remove();
+  }
+
+  invalidateUpgradeCache();
+}
+
 async function startNewGame(existingSaves: SaveMeta[]) {
   const usedCities = existingSaves.map(s => s.cityName);
   currentCityName = getRandomCity(usedCities);
   showLoadingOnStartScreen();
   platform.loadingStart();
   preloadSounds();
+  resetGameState();
   await initGame();
+  await rebuildBuildingFromState();
+  // Rebuild achievement signs for already-earned achievements
+  for (const ach of CONFIG.achievementSigns) {
+    if (accountAchievements.has(ach.id)) {
+      spawnAchievementSign(ach, false);
+    }
+  }
   platform.loadingStop();
   startScreen.classList.add('hidden');
   menuBtn.style.display = 'flex';
@@ -4019,6 +4102,7 @@ async function startNewGame(existingSaves: SaveMeta[]) {
   // Track city for achievements
   citiesPlayed.add(currentCityName);
   saveAccountData(platform, { earnedAchievements: [...accountAchievements], citiesPlayed: [...citiesPlayed] });
+  renderUI();
 }
 
 async function loadAndStart(cityName: string) {
