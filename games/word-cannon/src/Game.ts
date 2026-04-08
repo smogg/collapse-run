@@ -1,8 +1,9 @@
-import { Enemy, Particle, Bullet, ActiveDebuff, ActivePowerup, EnemyType, DebuffKind, PowerupKind, PlayerProfile, RunRecord, createDefaultProfile, Explosion, LightningArc, Missile, DamageNumber, UpgradeDef, CritSlash } from './types';
+import { Enemy, Particle, Bullet, ActiveDebuff, ActivePowerup, EnemyType, DebuffKind, PowerupKind, PlayerProfile, RunRecord, createDefaultProfile, Explosion, LightningArc, Missile, DamageNumber, UpgradeDef, CritSlash, InputMode, Fragment, FragmentConfig } from './types';
 import { Renderer } from './systems/Renderer';
 import { AudioManager } from './systems/AudioManager';
 import { AdManager } from './systems/AdManager';
 import { getRandomWord, getDebuffWord, getPowerupWord } from './data/words';
+import { splitWord } from './data/syllables';
 import { ALL_UPGRADES } from './data/upgrades';
 import * as C from './config';
 
@@ -148,6 +149,19 @@ export class Game {
   // Upgrades
   private upgrades: Map<string, number> = new Map();
   private upgradeOptions: UpgradeDef[] = [];
+
+  // Fragment mode (mobile tap controls)
+  private inputMode: InputMode = 'keyboard';
+  private fragments: Fragment[] = [];
+  private nextFragmentSlot = 0;
+  private nextFragmentId = 0;
+  private fragmentEnemyIds: Set<number> = new Set(); // enemies that already have fragments
+  private fragmentConfig: FragmentConfig = {
+    minSize: C.FRAGMENT_MIN_SIZE,
+    maxSize: C.FRAGMENT_MAX_SIZE,
+    preferSize: C.FRAGMENT_PREFER_SIZE,
+    syllableAware: true,
+  };
 
   // Profile
   profile: PlayerProfile;
@@ -326,7 +340,10 @@ export class Game {
 
       if (this.state === 'title') {
         if (this.showStatsModal) { this.showStatsModal = false; return; }
-        this.startRun();
+        const k = e.key.toUpperCase();
+        if (k === 'T') { this.inputMode = 'keyboard'; this.startRun(); }
+        else if (k === 'F') { this.inputMode = 'fragments'; this.startRun(); }
+        else { this.inputMode = 'keyboard'; this.startRun(); }
         return;
       }
 
@@ -360,6 +377,9 @@ export class Game {
           return;
         }
 
+        // In fragment mode, keyboard typing is disabled
+        if (this.inputMode === 'fragments') return;
+
         const key = e.key.toUpperCase();
         if (key.length === 1 && key >= 'A' && key <= 'Z') {
           this.handleTyping(key);
@@ -386,7 +406,11 @@ export class Game {
           this.showStatsModal = true;
           return;
         }
-        this.startRun();
+        // Check TYPE / TAP button clicks
+        const btnResult = this.renderer.getModeButtonClicked(pos.x, pos.y);
+        if (btnResult === 'keyboard') { this.inputMode = 'keyboard'; this.startRun(); }
+        else if (btnResult === 'fragments') { this.inputMode = 'fragments'; this.startRun(); }
+        // Clicking elsewhere does nothing — must choose a mode
         return;
       }
       if (this.state === 'upgradeSelect') {
@@ -419,6 +443,15 @@ export class Game {
           }
         }
         this.restart();
+      }
+
+      // Fragment tap handling during gameplay
+      if (this.state === 'playing' && this.inputMode === 'fragments') {
+        const pos = this.renderer.screenToGame(e.clientX, e.clientY);
+        const tapped = this.renderer.getFragmentAtPosition(pos.x, pos.y, this.fragments);
+        if (tapped) {
+          this.handleFragmentTap(tapped);
+        }
       }
     });
   }
@@ -499,6 +532,179 @@ export class Game {
     }
   }
 
+  // ── Fragment mode ──
+
+  private handleFragmentTap(fragment: Fragment): void {
+    if (!fragment.active || fragment.fadeOut > 0) return;
+
+    this.audio.playType();
+    this.lettersTyped += fragment.text.length;
+    this.totalKeys += fragment.text.length;
+
+    // Track letter stats for each letter in fragment
+    for (const ch of fragment.text) {
+      if (!this.runLetterStats[ch]) this.runLetterStats[ch] = { correct: 0, total: 0 };
+      this.runLetterStats[ch].total++;
+    }
+
+    const enemy = this.enemies.find(e => e.id === fragment.enemyId && e.active);
+    if (!enemy) return;
+
+    // Get the fragments for this enemy in order
+    const enemyFragments = this.fragments
+      .filter(f => f.enemyId === enemy.id && f.active && f.fadeOut === 0)
+      .sort((a, b) => a.segmentIndex - b.segmentIndex);
+
+    // Find what the next expected fragment is
+    const nextFragment = enemyFragments.find(f => f.segmentIndex >= (enemy.typed / f.text.length | 0));
+
+    if (this.targetEnemy && this.targetEnemy !== enemy) {
+      // Currently targeting a different enemy — check if this fragment is for the targeted one
+      const targetFrags = this.fragments
+        .filter(f => f.enemyId === this.targetEnemy!.id && f.active && f.fadeOut === 0)
+        .sort((a, b) => a.segmentIndex - b.segmentIndex);
+      const nextTargetFrag = this.getNextFragmentForEnemy(this.targetEnemy);
+      if (nextTargetFrag && nextTargetFrag.id === fragment.id) {
+        // Correct tap for current target
+        this.advanceFragmentTyping(this.targetEnemy, fragment);
+        return;
+      }
+      // Wrong target — mistype
+      this.targetEnemy.typed = 0;
+      this.targetEnemy.targeted = false;
+      this.targetEnemy = null;
+      this.typedBuffer = '';
+      this.combo = 0;
+      this.audio.playMistype();
+      this.triggerShake(3, 100);
+      return;
+    }
+
+    if (this.targetEnemy === enemy) {
+      // Already targeting this enemy — check if it's the next fragment
+      const nextFrag = this.getNextFragmentForEnemy(enemy);
+      if (nextFrag && nextFrag.id === fragment.id) {
+        this.advanceFragmentTyping(enemy, fragment);
+      } else {
+        // Wrong fragment for this enemy
+        enemy.typed = 0;
+        enemy.targeted = false;
+        this.targetEnemy = null;
+        this.typedBuffer = '';
+        this.combo = 0;
+        this.audio.playMistype();
+        this.triggerShake(3, 100);
+      }
+      return;
+    }
+
+    // No target yet — find if this fragment starts any word
+    const isFirstFragment = fragment.segmentIndex === 0;
+    if (isFirstFragment) {
+      // Track correct letters
+      for (const ch of fragment.text) {
+        if (this.runLetterStats[ch]) this.runLetterStats[ch].correct++;
+      }
+      this.correctKeys += fragment.text.length;
+      this.targetEnemy = enemy;
+      enemy.targeted = true;
+      enemy.typed = fragment.text.length;
+      this.targetStartTime = performance.now();
+      this.typedBuffer = fragment.text;
+      fragment.fadeOut = performance.now();
+      this.fireBullet(enemy);
+      if (enemy.typed >= enemy.word.length) {
+        this.completeSegment(enemy);
+      }
+    } else {
+      // Not a starting fragment and no target — mistype
+      this.combo = 0;
+      this.audio.playMistype();
+      this.triggerShake(3, 100);
+    }
+  }
+
+  private advanceFragmentTyping(enemy: Enemy, fragment: Fragment): void {
+    for (const ch of fragment.text) {
+      if (this.runLetterStats[ch]) this.runLetterStats[ch].correct++;
+    }
+    this.correctKeys += fragment.text.length;
+    enemy.typed += fragment.text.length;
+    this.typedBuffer += fragment.text;
+    fragment.fadeOut = performance.now();
+    this.fireBullet(enemy);
+    if (enemy.typed >= enemy.word.length) {
+      this.completeSegment(enemy);
+    }
+  }
+
+  private getNextFragmentForEnemy(enemy: Enemy): Fragment | null {
+    const frags = this.fragments
+      .filter(f => f.enemyId === enemy.id && f.active && f.fadeOut === 0)
+      .sort((a, b) => a.segmentIndex - b.segmentIndex);
+    // Find the first fragment that hasn't been tapped yet
+    // enemy.typed tells us how many characters have been typed
+    let charsSoFar = 0;
+    for (const f of frags) {
+      if (charsSoFar >= enemy.typed) return f;
+      charsSoFar += f.text.length;
+    }
+    return null;
+  }
+
+  private generateFragmentsForEnemy(enemy: Enemy): void {
+    if (this.fragmentEnemyIds.has(enemy.id)) return;
+    this.fragmentEnemyIds.add(enemy.id);
+
+    const chunks = splitWord(enemy.word, this.fragmentConfig);
+    for (let i = 0; i < chunks.length; i++) {
+      this.fragments.push({
+        id: this.nextFragmentId++,
+        text: chunks[i],
+        enemyId: enemy.id,
+        segmentIndex: i,
+        slotIndex: this.nextFragmentSlot++,
+        active: true,
+        fadeOut: 0,
+      });
+    }
+  }
+
+  private updateFragments(now: number): void {
+    // Generate fragments for closest enemies
+    const activeEnemies = this.enemies
+      .filter(e => e.active)
+      .sort((a, b) => b.y - a.y); // closest to bottom first
+
+    const toShow = activeEnemies.slice(0, C.FRAGMENT_MAX_WORDS);
+    for (const e of toShow) {
+      this.generateFragmentsForEnemy(e);
+    }
+
+    // Clean up fragments for dead/inactive enemies
+    for (const f of this.fragments) {
+      if (!f.active) continue;
+      const enemy = this.enemies.find(e => e.id === f.enemyId);
+      if (!enemy || !enemy.active) {
+        if (f.fadeOut === 0) f.fadeOut = now;
+      }
+    }
+
+    // Mark fully faded fragments as inactive
+    for (const f of this.fragments) {
+      if (f.fadeOut > 0 && now - f.fadeOut > C.FRAGMENT_FADE_DURATION) {
+        f.active = false;
+      }
+    }
+  }
+
+  private clearFragments(): void {
+    this.fragments = [];
+    this.nextFragmentSlot = 0;
+    this.nextFragmentId = 0;
+    this.fragmentEnemyIds.clear();
+  }
+
   /** Called when a word segment is fully typed. Either advance to next segment or kill. */
   private completeSegment(enemy: Enemy): void {
     const segmentDamage = 1;
@@ -548,6 +754,11 @@ export class Game {
         enemy.targeted = false;
         this.targetEnemy = null;
       }
+      // Regenerate fragments for new segment
+      if (this.inputMode === 'fragments') {
+        this.fragmentEnemyIds.delete(enemy.id);
+        this.generateFragmentsForEnemy(enemy);
+      }
       this.audio.playSegmentHit();
       this.spawnParticles(enemy.x, enemy.y, this.getEnemyColor(enemy), 6);
       this.spawnDamageNumber(enemy.x, enemy.y - 20, `-${segmentDamage}`, '#ffaa44');
@@ -567,7 +778,7 @@ export class Game {
 
   private fireBullet(target: Enemy): void {
     const cx = this.renderer.w / 2;
-    const cy = this.renderer.h - C.CANNON_Y_OFFSET;
+    const cy = this.renderer.gameH - C.CANNON_Y_OFFSET;
     this.bullets.push({
       x: cx, y: cy,
       targetX: target.x, targetY: target.y,
@@ -790,6 +1001,7 @@ export class Game {
     this.damageNumbers = [];
     this.targetEnemy = null;
     this.typedBuffer = '';
+    this.clearFragments();
     this.adManager.gameplayStop();
     this.audio.playCombo();
   }
@@ -829,6 +1041,7 @@ export class Game {
     this.combo = 0;
     this.targetEnemy = null;
     this.typedBuffer = '';
+    this.clearFragments();
     this.lastSpawnTime = 0;
     this.runStartTime = performance.now();
     this.lastPaceSample = 0;
@@ -1069,6 +1282,7 @@ export class Game {
     if (this.levelEnemiesSpawned < C.WARMUP_ENEMY_COUNT) speed *= C.WARMUP_SPEED_MULT;
     this.levelEnemiesSpawned++;
     if (type === 'tank') speed *= C.TANK_SPEED_MULT;
+    if (this.inputMode === 'fragments') speed *= C.FRAGMENT_MODE_SPEED_MULT;
     const actualSpeed = this.hasPowerup('freeze') ? speed * 0.3 : speed;
 
     const estWidth = word.length * 20 + 36;
@@ -1135,6 +1349,7 @@ export class Game {
     this.runLetterStats = {};
     this.upgrades = new Map();
     this.upgradeOptions = [];
+    this.clearFragments();
     this.adManager.onRunStart();
     this.adManager.gameplayStart();
   }
@@ -1369,7 +1584,7 @@ export class Game {
         e.scale = 0.5 + t * 0.5;
       }
 
-      const bottomY = this.renderer.h - C.CANNON_Y_OFFSET + 10;
+      const bottomY = this.renderer.gameH - C.CANNON_Y_OFFSET + 10;
 
       // Temporal Shield: enemies pause at the bottom before dealing damage
       const shieldStacks = this.upgradeStacks('temporal_shield');
@@ -1405,7 +1620,7 @@ export class Game {
 
         if (this.shields > 0) {
           this.shields--;
-          this.spawnParticles(e.x, this.renderer.h - C.CANNON_Y_OFFSET, '#88ffff', 8);
+          this.spawnParticles(e.x, this.renderer.gameH - C.CANNON_Y_OFFSET, '#88ffff', 8);
           continue;
         }
 
@@ -1413,7 +1628,7 @@ export class Game {
         this.audio.playHit();
         this.triggerShake(8, 200);
         this.flashScreen(C.COLOR_HEALTH, 0.2);
-        this.spawnParticles(e.x, this.renderer.h - C.CANNON_Y_OFFSET, C.COLOR_HEALTH, C.PARTICLE_COUNT_HIT);
+        this.spawnParticles(e.x, this.renderer.gameH - C.CANNON_Y_OFFSET, C.COLOR_HEALTH, C.PARTICLE_COUNT_HIT);
         this.combo = 0;
 
         if (this.health <= 0) { this.die(); return; }
@@ -1423,6 +1638,11 @@ export class Game {
     this.enemies = this.enemies.filter(e => e.active);
     this.debuffs = this.debuffs.filter(d => d.endsAt > now);
     this.powerups = this.powerups.filter(p => p.endsAt > now);
+
+    // Update fragment mode
+    if (this.inputMode === 'fragments') {
+      this.updateFragments(now);
+    }
 
     if (this.shakeIntensity > 0) {
       if (now - this.shakeStart > this.shakeDuration) this.shakeIntensity = 0;
@@ -1448,6 +1668,9 @@ export class Game {
       this.renderer.endFrame();
       return;
     }
+
+    // Set fragment mode viewport scaling
+    this.renderer.setFragmentMode(this.inputMode === 'fragments');
 
     if (this.state === 'dead' || this.state === 'ad') {
       for (const p of this.particles) this.renderer.drawParticle(p);
@@ -1475,7 +1698,7 @@ export class Game {
 
     // Playing
     const cx = this.renderer.w / 2;
-    const cy = this.renderer.h - C.CANNON_Y_OFFSET;
+    const cy = this.renderer.gameH - C.CANNON_Y_OFFSET;
     if (this.targetEnemy && this.targetEnemy.active) {
       this.renderer.drawTargetingLaser(cx, cy, this.targetEnemy.x, this.targetEnemy.y, now);
     }
@@ -1499,7 +1722,7 @@ export class Game {
     for (const v of this.upgrades.values()) totalUpgradeLevels += v;
     this.renderer.drawCannon(cx, cy, totalUpgradeLevels, now);
     this.renderer.drawOwnedUpgrades(this.upgrades, ALL_UPGRADES, now);
-    this.renderer.drawDangerZone(this.renderer.h - C.CANNON_Y_OFFSET + 10, now);
+    this.renderer.drawDangerZone(this.renderer.gameH - C.CANNON_Y_OFFSET + 10, now);
 
     if (this.flashAlpha > 0) this.renderer.drawFlash(this.flashColor, this.flashAlpha);
     if (this.hasDebuff('rush')) this.renderer.drawRushOverlay(now);
@@ -1512,6 +1735,13 @@ export class Game {
       this.level, this.levelWordsKilled, this.levelDef.wordsToKill,
       accuracy, this.pbDelta, this.shields,
     );
+
+    // Draw fragment grid for tap mode
+    if (this.inputMode === 'fragments') {
+      const targetId = this.targetEnemy?.id ?? -1;
+      const nextFrag = this.targetEnemy ? this.getNextFragmentForEnemy(this.targetEnemy) : null;
+      this.renderer.drawFragments(this.fragments, targetId, nextFrag?.id ?? -1, now);
+    }
 
     this.renderer.endFrame();
   }

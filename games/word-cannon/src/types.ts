@@ -1,5 +1,24 @@
 export type EnemyType = 'normal' | 'debuff' | 'powerup' | 'tank' | 'boss' | 'splitter';
 
+export type InputMode = 'keyboard' | 'fragments';
+
+export interface FragmentConfig {
+  minSize: number;
+  maxSize: number;
+  preferSize: number;
+  syllableAware: boolean;
+}
+
+export interface Fragment {
+  id: number;
+  text: string;
+  enemyId: number;
+  segmentIndex: number;  // which chunk within the word (0, 1, 2...)
+  slotIndex: number;     // stable grid position
+  active: boolean;
+  fadeOut: number;        // 0 = visible, >0 = timestamp when fade started
+}
+
 export type DebuffKind = 'rush';
 export type PowerupKind = 'freeze' | 'shield' | 'heal';
 
